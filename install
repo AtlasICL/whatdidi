@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+INFO_COLOR="\033[92m"       # green
+SUCCESS_COLOR="\033[35m"    # purple
+ERROR_COLOR="\033[31m"      # red
+BAKINFO_COLOR="\033[94m"    # blue
+PROG_COLOR="\033[38;5;208m" # orange
+BG_NAVY="\033[48;5;19m"     # dark blue (for highlighting)
+RESET="\033[0m"
+
 info()  { printf "\n${INFO_COLOR}[INFO] %s${RESET}\n" "$*"; }
 bakinfo() { printf "${BAKINFO_COLOR}[INFO] %s${RESET}\n" "$*"; }
 success() { printf "\n${SUCCESS_COLOR}[OK  ] %s${RESET}\n" "$*"; }
@@ -17,11 +25,11 @@ sudo chmod 644 "$INSTALL_PATH"
 
 # Add source line to ~/.bashrc only if not already present - idempotent
 if ! grep -qxF "$SOURCE_LINE" ~/.bashrc 2>/dev/null; then
-  echo "" >> ~/.bashrc
-  echo "$SOURCE_LINE" >> ~/.bashrc
-  info "Added source line to ~/.bashrc"
+    echo "" >> ~/.bashrc
+    echo "$SOURCE_LINE" >> ~/.bashrc
+    info "Added source line to ~/.bashrc"
 else
-  info "~/.bashrc already sources whatdidi — skipping"
+    info "~/.bashrc already sources whatdidi - skipping"
 fi
 
 success "Done! Restart terminal session, or run source ~/.bashrc"
