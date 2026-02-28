@@ -25,11 +25,16 @@ whatdidi "git push" 2
 ```
 
 ## Installation
-To install, simply clone the repo and run the installation script.
+One-liner installation with curl:
+```
+tmp=$(mktemp -d) && curl -sLo "$tmp/whatdidi" https://raw.githubusercontent.com/AtlasICL/whatdidi/main/whatdidi && curl -sLo "$tmp/install" https://raw.githubusercontent.com/AtlasICL/whatdidi/main/install && bash "$tmp/install" && rm -rf "$tmp"
+```
+
+After installation, you need to either `source ~/.bashrc` or restart your terminal to use the tool.
+
+Alternatively, clone the repo and run the installation script:
 ```
 git clone https://github.com/AtlasICL/whatdidi
 cd whatdidi
 bash install
 ```
-
-The install script will take of everything for you.
