@@ -10,7 +10,7 @@ BG_NAVY="\033[48;5;19m"     # dark blue (for highlighting)
 RESET="\033[0m"
 
 info() { printf "\n${INFO_COLOR}[INFO] %s${RESET}\n" "$*"; }
-importantinfo() { printf "\n${IMPORTANT_COLOR}[INFO] %s${RESET}\n" "$*"; }
+importantinfo() { printf "\n${IMPORTANT_COLOR}[OK  ] %s${RESET}\n" "$*"; }
 bakinfo() { printf "${BAKINFO_COLOR}[INFO] %s${RESET}\n" "$*"; }
 success() { printf "\n${SUCCESS_COLOR}[OK  ] %s${RESET}\n" "$*"; }
 warn() { printf "\n${ERROR_COLOR}[WARN] %s${RESET}\n" "$*"; }
