@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+info()  { printf "\n${INFO_COLOR}[INFO] %s${RESET}\n" "$*"; }
+bakinfo() { printf "${BAKINFO_COLOR}[INFO] %s${RESET}\n" "$*"; }
+success() { printf "\n${SUCCESS_COLOR}[OK  ] %s${RESET}\n" "$*"; }
+warn() { printf "\n${ERROR_COLOR}[WARN] %s${RESET}\n" "$*"; }
+error() { printf "\n${ERROR_COLOR}[ERR ] %s${RESET}\n" "$*"; }
+
+INSTALL_PATH="/usr/local/bin/whatdidi"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SOURCE_LINE="source /usr/local/bin/whatdidi"
+
+info "Installing whatdidi to $INSTALL_PATH ..."
+sudo cp "$SCRIPT_DIR/whatdidi" "$INSTALL_PATH"
+sudo chmod 644 "$INSTALL_PATH"
+
+# Add source line to ~/.bashrc only if not already present - idempotent
+if ! grep -qxF "$SOURCE_LINE" ~/.bashrc 2>/dev/null; then
+  echo "" >> ~/.bashrc
+  echo "$SOURCE_LINE" >> ~/.bashrc
+  info "Added source line to ~/.bashrc"
+else
+  info "~/.bashrc already sources whatdidi — skipping"
+fi
+
+success "Done! Restart terminal session, or run source ~/.bashrc"

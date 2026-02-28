@@ -1,0 +1,36 @@
+# whatdidi — define a function that searches *this shell's* history
+# Install: put this file somewhere (e.g. /usr/local/bin/whatdidi)
+# Enable:  source /usr/local/bin/whatdidi  (or add to ~/.bashrc)
+
+whatdidi() {
+  local needle count line
+  needle="${1:-}"
+  count="${2:-1}"
+
+  if [[ -z "$needle" || $# -gt 2 ]]; then
+    echo "Usage: whatdidi <command> [count]" >&2
+    return 2
+  fi
+  if ! [[ "$count" =~ ^[0-9]+$ ]] || [[ "$count" -lt 1 ]]; then
+    echo "whatdidi: count must be a positive integer" >&2
+    return 2
+  fi
+
+  # Save current session history
+  builtin history -a 2>/dev/null || true
+  builtin history -n 2>/dev/null || true
+
+  # Walk history from most-recent to oldest and print the first N matches.
+  builtin history | tac | sed -E 's/^[[:space:]]*[0-9]+[[:space:]]+//' | \
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    [[ "$line" == whatdidi\ * ]] && continue
+
+    if [[ "$line" =~ ^[[:space:]]*(${needle})([[:space:]]|$) ]] || \
+       [[ "$line" =~ ^[[:space:]]*sudo[[:space:]]+(${needle})([[:space:]]|$) ]]; then
+      printf '%s\n' "$line"
+      count=$((count-1))
+      [[ "$count" -le 0 ]] && break
+    fi
+  done
+}
