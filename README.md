@@ -31,6 +31,11 @@ whatdidi rm 2
 > sudo rm bar.txt
 ```
 
+### Set the default number of results:
+```
+whatdidi --set-default 3
+```
+
 # Installation
 One-liner installation with curl:
 ```

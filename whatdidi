@@ -1,18 +1,63 @@
-# whatdidi — define a function that searches *this shell's* history
-# Install: put this file somewhere (e.g. /usr/local/bin/whatdidi)
-# Enable:  source /usr/local/bin/whatdidi  (or add to ~/.bashrc)
+# Install: put this file somewhere (default /usr/local/bin/whatdidi)
+# Enable:  source /usr/local/bin/whatdidi (or add to ~/.bashrc)
 
 whatdidi() {
-  local needle count line
+  local needle count line default_count _wdi_conf
+  _wdi_conf="${HOME}/.config/whatdidi/config"
+  default_count=1
+  [[ -f "$_wdi_conf" ]] && source "$_wdi_conf"
   needle="${1:-}"
-  count="${2:-1}"
+  count="${2:-$default_count}"
+
+  if [[ "$needle" == "--help" || "$needle" == "-h" ]]; then
+    cat <<'HELP'
+whatdidi: recall what you ran
+
+Usage:
+  whatdidi <command> [count]
+  whatdidi --set-default <n>
+  whatdidi --help
+
+Arguments:
+  command   The command name to search for in your shell history.
+            Use quotes for multi-word commands (e.g. "git push").
+  count     Number of recent matches to show (default: 1).
+
+Options:
+  --set-default <n>   Set the default number of results to show
+                            when count is not specified. Persists across
+                            sessions (~/.config/whatdidi/config).
+  -h, --help                Show this help message.
+
+Examples:
+  whatdidi curl                 # last curl command you ran
+  whatdidi mvn 3                # last 3 mvn commands
+  whatdidi "git push" 2         # last 2 git push commands
+  whatdidi --set-default 5      # always show 5 results by default
+
+Commands prefixed with sudo are matched automatically.
+HELP
+    return 0
+  fi
+
+  if [[ "$needle" == "--set-default" ]]; then
+    local new_count="${2:-}"
+    if [[ -z "$new_count" ]] || ! [[ "$new_count" =~ ^[0-9]+$ ]] || [[ "$new_count" -lt 1 ]]; then
+      echo "whatdidi: --set-default requires a nonzero positive int" >&2
+      return 2
+    fi
+    mkdir -p "${HOME}/.config/whatdidi"
+    printf 'default_count=%s\n' "$new_count" > "$_wdi_conf"
+    echo "whatdidi: default count set to $new_count"
+    return 0
+  fi
 
   if [[ -z "$needle" || $# -gt 2 ]]; then
-    echo "Usage: whatdidi <command> [count]" >&2
+    echo "Usage: whatdidi <command> [count]  (try --help)" >&2
     return 2
   fi
   if ! [[ "$count" =~ ^[0-9]+$ ]] || [[ "$count" -lt 1 ]]; then
-    echo "whatdidi: count must be a positive integer" >&2
+    echo "whatdidi: count must be a nonzero positive int" >&2
     return 2
   fi
 
