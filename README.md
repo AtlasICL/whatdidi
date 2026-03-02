@@ -35,6 +35,8 @@ whatdidi rm 2
 ```
 whatdidi --set-default 3
 ```
+This preference is stored in `~/.config/whatdidi/config`
+
 
 # Installation
 One-liner installation with curl:
