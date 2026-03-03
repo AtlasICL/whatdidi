@@ -200,7 +200,7 @@ test_count_zero_returns_2() {
 test_count_non_integer_returns_2() {
     run_ni curl abc
     assert_eq 2 "$NI_EXIT" "exit code" &&
-    assert_contains "$NI_STDERR" "positive integer" "error message"
+    assert_contains "$NI_STDERR" "nonzero positive int" "error message"
 }
 
 test_count_float_returns_2() {
@@ -252,7 +252,7 @@ test_set_default_count_overwrites() {
 test_set_default_count_missing_value_returns_2() {
     run_ni --set-default
     assert_eq 2 "$NI_EXIT" "exit code" &&
-    assert_contains "$NI_STDERR" "positive integer" "error message"
+    assert_contains "$NI_STDERR" "nonzero positive int" "error message"
 }
 
 test_set_default_count_zero_returns_2() {
