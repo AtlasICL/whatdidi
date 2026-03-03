@@ -1,5 +1,5 @@
-# Install: put this file somewhere (default /usr/local/bin/whatdidi)
-# Enable:  source /usr/local/bin/whatdidi (or add to ~/.bashrc)
+# Install: 1) add this file to /usr/local/bin/whatdidi
+#          2) add `source /usr/local/bin/whatdidi` to ~/.bashrc
 
 whatdidi() {
   local needle count line default_count _wdi_conf
@@ -11,12 +11,8 @@ whatdidi() {
 
   if [[ "$needle" == "--help" || "$needle" == "-h" ]]; then
     cat <<'HELP'
-whatdidi: recall what you ran
-
 Usage:
   whatdidi <command> [count]
-  whatdidi --set-default <n>
-  whatdidi --help
 
 Arguments:
   command   The command name to search for in your shell history.
@@ -25,15 +21,15 @@ Arguments:
 
 Options:
   --set-default <n>   Set the default number of results to show
-                            when count is not specified. Persists across
-                            sessions (~/.config/whatdidi/config).
-  -h, --help                Show this help message.
+                      when count is not specified. Persists across
+                      sessions (~/.config/whatdidi/config).
+  -h, --help          Show this help message.
 
 Examples:
-  whatdidi curl                 # last curl command you ran
-  whatdidi mvn 3                # last 3 mvn commands
-  whatdidi "git push" 2         # last 2 git push commands
-  whatdidi --set-default 5      # always show 5 results by default
+  whatdidi curl                # last curl command you ran
+  whatdidi mvn 3               # last 3 mvn commands
+  whatdidi "git push" 2        # last 2 git push commands
+  whatdidi --set-default 5     # always show 5 results by default
 
 Commands prefixed with sudo are matched automatically.
 HELP
