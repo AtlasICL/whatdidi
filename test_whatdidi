@@ -157,7 +157,7 @@ test_help_mentions_sudo() {
 
 test_help_mentions_set_default_count() {
     run_ni --help
-    assert_contains "$NI_STDOUT" "--set-default-count" "documents --set-default-count"
+    assert_contains "$NI_STDOUT" "--set-default" "documents --set-default"
 }
 
 test_h_flag_exits_zero() {
@@ -214,59 +214,59 @@ test_count_negative_returns_2() {
 }
 
 # ═════════════════════════════════════════════════════════
-#  Category C: --set-default-count
+#  Category C: --set-default
 # ═════════════════════════════════════════════════════════
 
 test_set_default_count_exits_zero() {
-    run_ni --set-default-count 5
+    run_ni --set-default 5
     assert_eq 0 "$NI_EXIT" "exit code"
 }
 
 test_set_default_count_prints_confirmation() {
-    run_ni --set-default-count 5
+    run_ni --set-default 5
     assert_contains "$NI_STDOUT" "default count set to 5"
 }
 
 test_set_default_count_creates_dir() {
-    run_ni --set-default-count 3
+    run_ni --set-default 3
     [[ -d "$TEST_HOME/.config/whatdidi" ]] || {
         printf '    directory not created\n'; return 1
     }
 }
 
 test_set_default_count_writes_config() {
-    run_ni --set-default-count 7
+    run_ni --set-default 7
     local content
     content="$(cat "$TEST_HOME/.config/whatdidi/config")"
     assert_eq "default_count=7" "$content"
 }
 
 test_set_default_count_overwrites() {
-    run_ni --set-default-count 3
-    run_ni --set-default-count 9
+    run_ni --set-default 3
+    run_ni --set-default 9
     local content
     content="$(cat "$TEST_HOME/.config/whatdidi/config")"
     assert_eq "default_count=9" "$content" "second write overwrites"
 }
 
 test_set_default_count_missing_value_returns_2() {
-    run_ni --set-default-count
+    run_ni --set-default
     assert_eq 2 "$NI_EXIT" "exit code" &&
     assert_contains "$NI_STDERR" "positive integer" "error message"
 }
 
 test_set_default_count_zero_returns_2() {
-    run_ni --set-default-count 0
+    run_ni --set-default 0
     assert_eq 2 "$NI_EXIT" "exit code"
 }
 
 test_set_default_count_non_integer_returns_2() {
-    run_ni --set-default-count abc
+    run_ni --set-default abc
     assert_eq 2 "$NI_EXIT" "exit code"
 }
 
 test_set_default_count_large_value() {
-    run_ni --set-default-count 999
+    run_ni --set-default 999
     assert_eq 0 "$NI_EXIT" "exit code" &&
     local content
     content="$(cat "$TEST_HOME/.config/whatdidi/config")"
@@ -495,8 +495,8 @@ test_command_with_dollar_sign() {
 # ═════════════════════════════════════════════════════════
 
 test_set_then_use_default_count() {
-    # First set the default count via --set-default-count
-    run_ni --set-default-count 3
+    # First set the default count via --set-default
+    run_ni --set-default 3
     # The config file was created in TEST_HOME; now run a history search
     local hist
     hist="$(printf '%s\n' "mvn clean" "mvn install" "mvn test" "mvn package" "mvn verify")"
@@ -573,8 +573,8 @@ main() {
     run_test test_count_float_returns_2
     run_test test_count_negative_returns_2
 
-    # C: --set-default-count
-    printf '\n\033[1m--set-default-count\033[0m\n'
+    # C: --set-default
+    printf '\n\033[1m--set-default\033[0m\n'
     run_test test_set_default_count_exits_zero
     run_test test_set_default_count_prints_confirmation
     run_test test_set_default_count_creates_dir
