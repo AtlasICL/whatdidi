@@ -6,13 +6,13 @@ _HELPERS_LOADED=1
 
 set -euo pipefail
 
-# ── Constants ────────────────────────────────────────────
+# Constants
 WHATDIDI_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/whatdidi"
 PASS=0
 FAIL=0
 ERRORS=()
 
-# ── Test infrastructure ──────────────────────────────────
+# Test infrastructure
 
 setup() {
     TEST_TMPDIR="$(mktemp -d)"
@@ -38,7 +38,7 @@ run_test() {
     teardown
 }
 
-# ── Assertion helpers ────────────────────────────────────
+# Assertion helpers
 
 assert_eq() {
     local expected="$1" actual="$2" msg="${3:-}"
@@ -78,7 +78,7 @@ assert_line_count() {
     assert_eq "$expected" "$actual" "line count: $msg"
 }
 
-# ── Tier 1: non-interactive runner ───────────────────────
+# Tier 1: non-interactive runner
 # For code paths that return before reaching `builtin history`
 
 run_ni() {
@@ -97,7 +97,7 @@ run_ni() {
     NI_STDERR="$(cat "$stderr_f")"
 }
 
-# ── Tier 2: interactive runner with controlled history ───
+# Tier 2: interactive runner with controlled history
 # For testing the history search pipeline
 
 run_hi() {
@@ -135,8 +135,7 @@ HEREDOC
     HI_STDERR="$(grep -v -E 'bash.*cannot set terminal|no job control' "$stderr_f" || true)"
 }
 
-# ── Summary ──────────────────────────────────────────────
-
+# Summary
 print_summary() {
     printf '\n\033[1m=== Results: %d passed, %d failed ===\033[0m\n\n' "$PASS" "$FAIL"
     if (( FAIL > 0 )); then

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Category G: Compound (multi-word) needle
+# Category: Compound (multi-word) needle
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/helpers.sh"

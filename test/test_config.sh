@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Category D: Config file sourcing
+# Category: Config file sourcing
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/helpers.sh"

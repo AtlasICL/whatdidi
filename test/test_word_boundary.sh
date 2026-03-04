@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Category I: Word boundary / regex behavior
+# Category: Word boundary / regex behavior
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/helpers.sh"

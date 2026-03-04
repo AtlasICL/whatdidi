@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Category A: --help / -h
+# Category: --help / -h
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/helpers.sh"

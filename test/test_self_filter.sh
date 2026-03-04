@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Category H: Self-filter (skip whatdidi invocations)
+# Category: Self-filter (skip whatdidi invocations)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/helpers.sh"

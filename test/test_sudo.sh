@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Category F: Sudo matching
+# Category: Sudo matching
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/helpers.sh"

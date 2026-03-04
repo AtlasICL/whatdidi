@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Category E: Basic history search
+# Category: Basic history search
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/helpers.sh"
