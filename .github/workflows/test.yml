@@ -11,4 +11,4 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run tests
-        run: bash test_whatdidi
+        run: bash test/run_all.sh
