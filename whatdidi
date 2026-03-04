@@ -9,6 +9,13 @@ whatdidi() {
   needle="${1:-}"
   count="${2:-$default_count}"
 
+  if [[ "$needle" == "--version" || "$needle" == "-v" ]]; then
+    echo "whatdidi 1.0.1"
+    echo "Author: Emre Acarsoy"
+    echo "        <dev@eacarsoy.com>"
+    return 0
+  fi
+
   if [[ "$needle" == "--help" || "$needle" == "-h" ]]; then
     cat <<'HELP'
 Usage:
@@ -23,6 +30,7 @@ Options:
   --set-default <n>   Set the default number of results to show
                       when count is not specified. Persists across
                       sessions (~/.config/whatdidi/config).
+  -v, --version       Show version and author information.
   -h, --help          Show this help message.
 
 Examples:
