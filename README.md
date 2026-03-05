@@ -1,6 +1,9 @@
-# What did I?
-### A command line tool, for when you need a specific command you ran.
+![Version](https://img.shields.io/badge/version-1.0.1-blue)
+![License](https://img.shields.io/github/license/AtlasICL/whatdidi)
+![Tests](https://github.com/AtlasICL/whatdidi/actions/workflows/test.yml/badge.svg)
 
+# What did I?
+A command line tool for when you need a specific command you ran.
 
 ## Usage
 #### Search for the last command you ran:
