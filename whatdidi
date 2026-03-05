@@ -12,7 +12,6 @@ whatdidi() {
   if [[ "$needle" == "--version" || "$needle" == "-v" ]]; then
     echo "whatdidi 1.0.1"
     echo "Author: Emre Acarsoy"
-    echo "        <dev@eacarsoy.com>"
     return 0
   fi
 
