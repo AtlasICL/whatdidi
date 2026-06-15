@@ -19,11 +19,14 @@ test_whatdidi_with_args_skipped() {
     assert_not_contains "$HI_STDOUT" "whatdidi" "whatdidi invocation excluded"
 }
 
-test_searching_for_whatdidi_returns_nothing() {
+test_searching_for_whatdidi_returns_matches() {
+    # When the needle itself is "whatdidi", the self-filter is disabled so
+    # past whatdidi invocations are searchable like any other command.
     local hist
     hist="$(printf '%s\n' "whatdidi curl" "whatdidi git 5" "echo hello")"
     run_hi "$hist" "whatdidi 10"
-    assert_eq "" "$HI_STDOUT" "all whatdidi lines filtered, nothing left"
+    assert_contains "$HI_STDOUT" "whatdidi curl" "whatdidi invocation found" &&
+    assert_contains "$HI_STDOUT" "whatdidi git 5" "whatdidi invocation found"
 }
 
 test_bare_whatdidi_not_filtered() {
@@ -40,7 +43,7 @@ run_self_filter_tests() {
     printf '\033[1mSelf-filter\033[0m\n'
     run_test test_skips_whatdidi_invocations
     run_test test_whatdidi_with_args_skipped
-    run_test test_searching_for_whatdidi_returns_nothing
+    run_test test_searching_for_whatdidi_returns_matches
     run_test test_bare_whatdidi_not_filtered
 }
 

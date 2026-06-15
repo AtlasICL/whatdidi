@@ -72,7 +72,7 @@ HELP
   builtin history | tac | sed -E 's/^[[:space:]]*[0-9]+[[:space:]]+//' | \
   while IFS= read -r line; do
     [[ -z "$line" ]] && continue
-    [[ "$line" == whatdidi\ * ]] && continue
+    [[ "$needle" != whatdidi* && "$line" == whatdidi\ * ]] && continue
 
     if [[ "$line" =~ ^[[:space:]]*(${needle})([[:space:]]|$) ]] || \
        [[ "$line" =~ ^[[:space:]]*sudo[[:space:]]+(${needle})([[:space:]]|$) ]]; then
