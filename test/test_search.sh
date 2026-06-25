@@ -78,6 +78,15 @@ test_search_exit_code_on_no_match() {
     assert_eq 0 "$HI_EXIT" "exit code 0 even with no match"
 }
 
+test_search_exit_code_when_count_unmet() {
+    # whatdidi must report 0 even when the match is the oldest line processed
+    # and the requested count is never reached (guards the explicit return 0).
+    local hist
+    hist="$(printf '%s\n' "curl target" "echo a" "echo b")"
+    run_hi "$hist" "curl 5"
+    assert_eq 0 "$HI_EXIT" "exit 0 regardless of where the match falls"
+}
+
 run_search_tests() {
     printf '\033[1mHistory search\033[0m\n'
     run_test test_simple_match
@@ -90,6 +99,7 @@ run_search_tests() {
     run_test test_duplicate_entries_all_returned
     run_test test_search_exit_code_on_match
     run_test test_search_exit_code_on_no_match
+    run_test test_search_exit_code_when_count_unmet
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

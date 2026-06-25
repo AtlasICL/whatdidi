@@ -24,13 +24,21 @@ info "Installing whatdidi to $INSTALL_PATH ..."
 sudo cp "$SCRIPT_DIR/whatdidi" "$INSTALL_PATH"
 sudo chmod 644 "$INSTALL_PATH"
 
-# Add source line to ~/.bashrc only if not already present - idempotent
-if ! grep -qxF "$SOURCE_LINE" ~/.bashrc 2>/dev/null; then
-    echo "" >> ~/.bashrc
-    echo "$SOURCE_LINE" >> ~/.bashrc
-    info "Added source line to ~/.bashrc"
-else
-    info "~/.bashrc already sources whatdidi - skipping"
-fi
+# Add the source line to a shell rc file only if not already present - idempotent.
+# Appending creates the file if it does not exist yet.
+add_source_line() {
+    local rc="$1"
+    if ! grep -qxF "$SOURCE_LINE" "$rc" 2>/dev/null; then
+        echo "" >> "$rc"
+        echo "$SOURCE_LINE" >> "$rc"
+        info "Added source line to $rc"
+    else
+        info "$rc already sources whatdidi - skipping"
+    fi
+}
 
-importantinfo "Done! Restart terminal session, or run source ~/.bashrc"
+# whatdidi works in both bash and zsh - wire it into both.
+add_source_line "$HOME/.bashrc"
+add_source_line "$HOME/.zshrc"
+
+importantinfo "Done! Restart your terminal, or run: source ~/.bashrc  (bash)  /  source ~/.zshrc  (zsh)"

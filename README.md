@@ -1,4 +1,4 @@
-![Version](https://img.shields.io/badge/version-1.0.1-blue)
+![Version](https://img.shields.io/badge/version-1.1.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Tests](https://github.com/AtlasICL/whatdidi/actions/workflows/test.yml/badge.svg)
 
@@ -47,4 +47,6 @@ One-liner installation with curl:
 tmp=$(mktemp -d) && curl -sLo "$tmp/whatdidi" https://raw.githubusercontent.com/AtlasICL/whatdidi/main/whatdidi && curl -sLo "$tmp/install" https://raw.githubusercontent.com/AtlasICL/whatdidi/main/install && bash "$tmp/install" && rm -rf "$tmp"
 ```
 
-After installation, you need to either `source ~/.bashrc` or restart your terminal to use the tool.
+Works with both **bash** and **zsh** - the installer wires the tool into `~/.bashrc` and `~/.zshrc`.
+
+After installation, you need to either `source` your shell's rc file (`source ~/.bashrc` or `source ~/.zshrc`) or restart your terminal to use the tool.

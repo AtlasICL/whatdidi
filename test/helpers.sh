@@ -135,6 +135,61 @@ HEREDOC
     HI_STDERR="$(grep -v -E 'bash.*cannot set terminal|no job control' "$stderr_f" || true)"
 }
 
+# zsh variants of the runners above. They reuse the same NI_*/HI_* result vars
+# so zsh test functions read identically to the bash ones. zsh is launched with
+# -f (skip rc files, like bash's --norc --noprofile); seeded history is loaded
+# with `fc -R` instead of bash's `history -r`.
+
+run_ni_zsh() {
+    # Usage: run_ni_zsh [whatdidi args...]
+    # Sets: NI_STDOUT, NI_STDERR, NI_EXIT
+    local stdout_f="$TEST_TMPDIR/stdout" stderr_f="$TEST_TMPDIR/stderr"
+
+    set +e
+    HOME="$TEST_HOME" zsh -f -c '
+        source "'"$WHATDIDI_SRC"'"
+        whatdidi "$@"
+    ' _ "$@" >"$stdout_f" 2>"$stderr_f"
+    NI_EXIT=$?
+    set -e
+    NI_STDOUT="$(cat "$stdout_f")"
+    NI_STDERR="$(cat "$stderr_f")"
+}
+
+run_hi_zsh() {
+    # $1 = newline-separated history lines to seed
+    # $2 = full whatdidi invocation args (as a single string)
+    # $3 = (optional) config file contents
+    # Sets: HI_STDOUT, HI_STDERR, HI_EXIT
+    local hist_lines="$1"
+    local wdi_args="$2"
+    local config_contents="${3:-}"
+    local histfile="$TEST_TMPDIR/histfile"
+    local stdout_f="$TEST_TMPDIR/stdout"
+    local stderr_f="$TEST_TMPDIR/stderr"
+
+    printf '%s\n' "$hist_lines" > "$histfile"
+
+    if [[ -n "$config_contents" ]]; then
+        mkdir -p "$TEST_HOME/.config/whatdidi"
+        printf '%s\n' "$config_contents" > "$TEST_HOME/.config/whatdidi/config"
+    fi
+
+    set +e
+    HOME="$TEST_HOME" zsh -f -i <<HEREDOC >"$stdout_f" 2>"$stderr_f"
+export HISTFILE="$histfile"
+HISTSIZE=10000
+SAVEHIST=10000
+fc -R "\$HISTFILE"
+source "$WHATDIDI_SRC"
+whatdidi $wdi_args
+HEREDOC
+    HI_EXIT=$?
+    set -e
+    HI_STDOUT="$(cat "$stdout_f")"
+    HI_STDERR="$(grep -v -E 'cannot set terminal|no job control|can.t find terminal' "$stderr_f" || true)"
+}
+
 # Summary
 print_summary() {
     printf '\n\033[1m=== Results: %d passed, %d failed ===\033[0m\n\n' "$PASS" "$FAIL"

@@ -10,7 +10,7 @@ whatdidi() {
   count="${2:-$default_count}"
 
   if [[ "$needle" == "--version" || "$needle" == "-v" ]]; then
-    echo "whatdidi 1.0.1"
+    echo "whatdidi 1.1.0"
     echo "Author: Emre Acarsoy"
     return 0
   fi
@@ -64,12 +64,22 @@ HELP
     return 2
   fi
 
-  # Save current session history
-  builtin history -a 2>/dev/null || true
-  builtin history -n 2>/dev/null || true
+  # Refresh session history so the search sees the latest commands (bash only;
+  # zsh keeps the interactive history in memory already).
+  if [ -z "${ZSH_VERSION:-}" ]; then
+    builtin history -a 2>/dev/null || true
+    builtin history -n 2>/dev/null || true
+  fi
 
   # Walk history from most-recent to oldest and print the first N matches.
-  builtin history | tac | sed -E 's/^[[:space:]]*[0-9]+[[:space:]]+//' | \
+  # Both shells emit "<number>  <command>"; the sed strips the leading number.
+  {
+    if [ -n "${ZSH_VERSION:-}" ]; then
+      builtin fc -rl 1            # zsh: reverse-list ALL events (1 = from start)
+    else
+      builtin history | tac       # bash: full in-memory list, newest first
+    fi
+  } | sed -E 's/^[[:space:]]*[0-9]+[[:space:]]+//' | \
   while IFS= read -r line; do
     [[ -z "$line" ]] && continue
     [[ "$needle" != whatdidi* && "$line" == whatdidi\ * ]] && continue
@@ -81,4 +91,9 @@ HELP
       [[ "$count" -le 0 ]] && break
     fi
   done
+
+  # The while loop's exit status leaks the last iteration's test result, which
+  # differs between bash and zsh. Return success explicitly so the exit code is
+  # deterministic (whatdidi reports 0 whether or not anything matched).
+  return 0
 }

@@ -17,6 +17,7 @@ source "$SCRIPT_DIR/test_self_filter.sh"
 source "$SCRIPT_DIR/test_word_boundary.sh"
 source "$SCRIPT_DIR/test_edge_cases.sh"
 source "$SCRIPT_DIR/test_integration.sh"
+source "$SCRIPT_DIR/test_zsh.sh"
 
 printf '\n\033[1m=== whatdidi test suite ===\033[0m\n\n'
 
@@ -43,5 +44,7 @@ printf '\n'
 run_edge_cases_tests
 printf '\n'
 run_integration_tests
+printf '\n'
+run_zsh_tests
 
 print_summary
