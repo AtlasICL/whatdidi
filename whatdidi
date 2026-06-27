@@ -1,5 +1,5 @@
 # Install: 1) add this file to /usr/local/bin/whatdidi
-#          2) add `source /usr/local/bin/whatdidi` to ~/.bashrc
+#          2) add `source /usr/local/bin/whatdidi` to ~/.bashrc and/or ~/.zshrc
 
 whatdidi() {
   local needle count line default_count _wdi_conf _wdi_line
