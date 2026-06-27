@@ -33,6 +33,8 @@ Options:
   --set-default <n>   Set the default number of results to show
                       when count is not specified. Persists across
                       sessions (~/.config/whatdidi/config).
+  --update            Reinstall whatdidi with the latest version
+                      from the repository.
   -v, --version       Show version and author information.
   -h, --help          Show this help message.
 
@@ -45,6 +47,16 @@ Examples:
 Commands prefixed with sudo are matched automatically.
 HELP
     return 0
+  fi
+
+  if [[ "$needle" == "--update" ]]; then
+    if ! command -v curl >/dev/null 2>&1; then
+      echo "whatdidi: curl is required to update but was not found" >&2
+      return 1
+    fi
+    echo "whatdidi: fetching the latest version ..."
+    curl -fsSL https://raw.githubusercontent.com/AtlasICL/whatdidi/main/install | sh
+    return $?
   fi
 
   if [[ "$needle" == "--set-default" ]]; then
