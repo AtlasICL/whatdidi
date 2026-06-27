@@ -1,5 +1,10 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+# Install whatdidi. Two supported invocations:
+#   1) Remote one-liner: curl -fsSL .../install | sh
+#      (downloads the whatdidi script from the repo automatically)
+#   2) From a clone: ./install
+#      (installs the whatdidi file sitting next to this script)
+set -eu
 
 INFO_COLOR="\033[92m"       # green
 SUCCESS_COLOR="\033[35m"    # purple
@@ -16,18 +21,42 @@ success() { printf "\n${SUCCESS_COLOR}[OK  ] %s${RESET}\n" "$*"; }
 warn() { printf "\n${ERROR_COLOR}[WARN] %s${RESET}\n" "$*"; }
 error() { printf "\n${ERROR_COLOR}[ERR ] %s${RESET}\n" "$*"; }
 
+REPO_RAW="https://raw.githubusercontent.com/AtlasICL/whatdidi/main"
 INSTALL_PATH="/usr/local/bin/whatdidi"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SOURCE_LINE="source /usr/local/bin/whatdidi"
 
+# Prefer a whatdidi file sitting next to this script (clone/dev installs);
+# otherwise download it from the repo. This lets the same script run both from a
+# clone and via `curl ... | sh`, where there is no sibling file on disk.
+script_dir=""
+case "$0" in
+    */*) script_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd)" ;;
+esac
+
 info "Installing whatdidi to $INSTALL_PATH ..."
-sudo cp "$SCRIPT_DIR/whatdidi" "$INSTALL_PATH"
+if [ -n "$script_dir" ] && [ -f "$script_dir/whatdidi" ]; then
+    bakinfo "Using local copy: $script_dir/whatdidi"
+    sudo cp "$script_dir/whatdidi" "$INSTALL_PATH"
+else
+    if ! command -v curl >/dev/null 2>&1; then
+        error "curl is required to download whatdidi but was not found."
+        exit 1
+    fi
+    bakinfo "Downloading whatdidi from $REPO_RAW/whatdidi ..."
+    tmp="$(mktemp)"
+    trap 'rm -f "$tmp"' EXIT INT TERM
+    if ! curl -fsSL "$REPO_RAW/whatdidi" -o "$tmp"; then
+        error "Failed to download whatdidi from $REPO_RAW/whatdidi"
+        exit 1
+    fi
+    sudo cp "$tmp" "$INSTALL_PATH"
+fi
 sudo chmod 644 "$INSTALL_PATH"
 
 # Add the source line to a shell rc file only if not already present - idempotent.
 # Appending creates the file if it does not exist yet.
 add_source_line() {
-    local rc="$1"
+    rc="$1"
     if ! grep -qxF "$SOURCE_LINE" "$rc" 2>/dev/null; then
         echo "" >> "$rc"
         echo "$SOURCE_LINE" >> "$rc"

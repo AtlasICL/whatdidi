@@ -5,6 +5,18 @@
 # What did I?
 A command line tool for when you need a specific command you ran.
 
+## Installation
+One-liner installation with curl:
+```
+curl -fsSL https://raw.githubusercontent.com/AtlasICL/whatdidi/main/install | sh
+```
+
+Works with both **bash** and **zsh** - the installer wires the tool into `~/.bashrc` and `~/.zshrc`.
+
+After installation, to start using whatdidi, you should either:
+-  `source` your shell's rc file (`source ~/.bashrc` or `source ~/.zshrc`) 
+-  or restart your terminal
+
 ## Usage
 #### Search for the last command you ran:
 ```
@@ -39,14 +51,3 @@ whatdidi rm 2
 whatdidi --set-default 3
 ```
 This preference is stored in `~/.config/whatdidi/config`
-
-
-## Installation
-One-liner installation with curl:
-```
-tmp=$(mktemp -d) && curl -sLo "$tmp/whatdidi" https://raw.githubusercontent.com/AtlasICL/whatdidi/main/whatdidi && curl -sLo "$tmp/install" https://raw.githubusercontent.com/AtlasICL/whatdidi/main/install && bash "$tmp/install" && rm -rf "$tmp"
-```
-
-Works with both **bash** and **zsh** - the installer wires the tool into `~/.bashrc` and `~/.zshrc`.
-
-After installation, you need to either `source` your shell's rc file (`source ~/.bashrc` or `source ~/.zshrc`) or restart your terminal to use the tool.
