@@ -2,10 +2,14 @@
 #          2) add `source /usr/local/bin/whatdidi` to ~/.bashrc
 
 whatdidi() {
-  local needle count line default_count _wdi_conf
+  local needle count line default_count _wdi_conf _wdi_line
   _wdi_conf="${HOME}/.config/whatdidi/config"
   default_count=1
-  [[ -f "$_wdi_conf" ]] && source "$_wdi_conf"
+  if [[ -f "$_wdi_conf" ]]; then
+    while IFS= read -r _wdi_line || [[ -n "$_wdi_line" ]]; do
+      [[ "$_wdi_line" == default_count=* ]] && default_count="${_wdi_line#default_count=}"
+    done < "$_wdi_conf"
+  fi
   needle="${1:-}"
   count="${2:-$default_count}"
 
