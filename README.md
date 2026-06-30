@@ -5,12 +5,11 @@
 # What did I?
 A command line tool for when you need a specific command you ran.
 
-## Installation
-Compatible with bash and zsh.  
-One-liner installation with curl:
-```
+## Install
+```sh
 curl -fsSL https://raw.githubusercontent.com/AtlasICL/whatdidi/main/install | sh
 ```
+Compatible with bash and zsh.  
 
 ## Usage
 #### Search for the last command you ran:
