@@ -21,7 +21,7 @@ whatdidi() {
   count="${2:-$default_count}"
 
   if [[ "$needle" == "--version" || "$needle" == "-v" ]]; then
-    echo "whatdidi 1.1.0"
+    echo "whatdidi 1.2.0"
     echo "Author: Emre Acarsoy"
     return 0
   fi
