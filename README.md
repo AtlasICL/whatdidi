@@ -6,7 +6,7 @@
 A command line tool for when you need a specific command you ran.
 
 ## Install
-```sh
+```
 curl -fsSL https://raw.githubusercontent.com/AtlasICL/whatdidi/main/install | sh
 ```
 Compatible with bash and zsh.  
@@ -49,4 +49,9 @@ This preference is stored in `~/.config/whatdidi/config`
 #### Update to the latest version:
 ```
 whatdidi --update
+```
+
+#### Uninstall
+```
+whatdidi --uninstall
 ```
