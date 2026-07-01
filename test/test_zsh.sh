@@ -143,6 +143,16 @@ test_zsh_command_with_dollar_sign() {
     assert_contains "$HI_STDOUT" 'echo $HOME' "dollar sign preserved"
 }
 
+test_zsh_metachar_command_matched_literally() {
+    # The needle is matched literally under zsh too, so g++ is found and does
+    # not accidentally match c++.
+    local hist
+    hist="$(printf '%s\n' "g++ main.cpp -o main" "c++ other.cpp" "echo hello")"
+    run_hi_zsh "$hist" '"g++"'
+    assert_contains "$HI_STDOUT" "g++ main.cpp -o main" "g++ matched literally" &&
+    assert_not_contains "$HI_STDOUT" "c++" "g++ needle does not match c++"
+}
+
 test_zsh_default_count_from_config() {
     local hist
     hist="$(printf '%s\n' "curl a" "curl b" "curl c" "curl d")"
@@ -244,6 +254,7 @@ run_zsh_tests() {
     run_test test_zsh_searching_for_whatdidi_returns_matches
     run_test test_zsh_special_chars_in_command
     run_test test_zsh_command_with_dollar_sign
+    run_test test_zsh_metachar_command_matched_literally
     run_test test_zsh_default_count_from_config
     run_test test_zsh_exit_code_on_match
     run_test test_zsh_exit_code_zero_when_count_unmet

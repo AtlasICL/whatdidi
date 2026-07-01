@@ -62,6 +62,12 @@ sudo chmod 644 "$INSTALL_PATH"
 # Appending creates the file if it does not exist yet.
 add_source_line() {
     rc="$1"
+    # Only touch rc files the user already has — don't create e.g. a ~/.zshrc
+    # for someone who doesn't use zsh.
+    if [ ! -f "$rc" ]; then
+        print_info "$rc does not exist - skipping"
+        return 0
+    fi
     if ! grep -qxF "$SOURCE_LINE" "$rc" 2>/dev/null; then
         echo "" >> "$rc"
         echo "$SOURCE_LINE" >> "$rc"
@@ -69,10 +75,19 @@ add_source_line() {
     else
         print_info "$rc already sources whatdidi - skipping"
     fi
+    rc_written=1
 }
 
-# whatdidi works in both bash and zsh - wire it into both.
+# whatdidi works in both bash and zsh - wire it into whichever rc files exist.
 add_source_line "$HOME/.bashrc"
 add_source_line "$HOME/.zshrc"
+
+# If the user had neither rc file, whatdidi wouldn't be sourced anywhere;
+# create ~/.bashrc (the common default) so the tool works out of the box.
+if [ -z "${rc_written:-}" ]; then
+    print_warning "Neither ~/.bashrc nor ~/.zshrc exists; creating ~/.bashrc"
+    printf '\n%s\n' "$SOURCE_LINE" >> "$HOME/.bashrc"
+    print_info "Added source line to $HOME/.bashrc"
+fi
 
 print_success "Done! Restart your terminal to use whatdidi"

@@ -3,13 +3,19 @@
 
 
 whatdidi() {
-  local needle count line default_count _wdi_conf _wdi_line
+  local needle count line default_count _wdi_conf _wdi_line stripped desudo
   _wdi_conf="${HOME}/.config/whatdidi/config"
   default_count=1
   if [[ -f "$_wdi_conf" ]]; then
     while IFS= read -r _wdi_line || [[ -n "$_wdi_line" ]]; do
       [[ "$_wdi_line" == default_count=* ]] && default_count="${_wdi_line#default_count=}"
     done < "$_wdi_conf"
+  fi
+  # A corrupt/hand-edited config shouldn't make the tool unusable: fall back to
+  # the built-in default and warn rather than erroring out.
+  if ! [[ "$default_count" =~ ^[0-9]+$ ]] || [[ "$default_count" -lt 1 ]]; then
+    echo "whatdidi: invalid default_count in $_wdi_conf; using 1" >&2
+    default_count=1
   fi
   needle="${1:-}"
   count="${2:-$default_count}"
@@ -130,15 +136,32 @@ HELP
     if [ -n "${ZSH_VERSION:-}" ]; then
       builtin fc -rl 1            # zsh: reverse-list ALL events (1 = from start)
     else
-      builtin history | tac       # bash: full in-memory list, newest first
+      # Clear HISTTIMEFORMAT for this call so `history` emits "<n>  <command>"
+      # without a timestamp column (which the sed below would otherwise leave
+      # in, defeating the match). newest first via tac.
+      HISTTIMEFORMAT= builtin history | tac
     fi
   } | sed -E 's/^[[:space:]]*[0-9]+[[:space:]]+//' | \
   while IFS= read -r line; do
     [[ -z "$line" ]] && continue
     [[ "$needle" != whatdidi* && "$line" == whatdidi\ * ]] && continue
 
-    if [[ "$line" =~ ^[[:space:]]*(${needle})([[:space:]]|$) ]] || \
-       [[ "$line" =~ ^[[:space:]]*sudo[[:space:]]+(${needle})([[:space:]]|$) ]]; then
+    # Match the needle literally (not as a regex) so command names containing
+    # regex metacharacters — g++, c++, ./foo — are found. Strip leading
+    # whitespace, treat a leading `sudo` as transparent, and require the needle
+    # to be the whole command or be followed by whitespace (word boundary).
+    # Note: "$needle" is quoted (literal) while [[:space:]]* is the glob part.
+    stripped="${line#"${line%%[![:space:]]*}"}"
+    desudo="$stripped"
+    case "$desudo" in
+      sudo[[:space:]]*)
+        desudo="${desudo#sudo}"
+        desudo="${desudo#"${desudo%%[![:space:]]*}"}"
+        ;;
+    esac
+
+    if [[ "$stripped" == "$needle" || "$stripped" == "$needle"[[:space:]]* || \
+          "$desudo"  == "$needle" || "$desudo"  == "$needle"[[:space:]]* ]]; then
       printf '%s\n' "$line"
       count=$((count-1))
       [[ "$count" -le 0 ]] && break

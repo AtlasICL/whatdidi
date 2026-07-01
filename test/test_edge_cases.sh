@@ -29,41 +29,37 @@ test_command_with_dollar_sign() {
     assert_contains "$HI_STDOUT" 'echo $HOME' "dollar sign preserved"
 }
 
-test_regex_dot_star_needle_matches_everything() {
-    # Needle is interpolated into a regex, so ".*" matches all commands —
-    # including internal session setup lines, not just seeded history.
+test_metachar_command_matched_literally() {
+    # Command names containing regex metacharacters must be found — the needle
+    # is matched literally, not compiled into a regex.
+    local hist
+    hist="$(printf '%s\n' "g++ main.cpp -o main" "c++ other.cpp" "echo hello")"
+    run_hi "$hist" '"g++"'
+    assert_contains "$HI_STDOUT" "g++ main.cpp -o main" "g++ matched literally" &&
+    assert_not_contains "$HI_STDOUT" "c++" "g++ needle does not match c++"
+}
+
+test_regex_metachars_are_inert() {
+    # A needle with regex metacharacters is NOT interpreted as a regex:
+    # ".*" / "curl|ls" / "[cC]url" match nothing because no literal command
+    # is named that.
     local hist
     hist="$(printf '%s\n' "curl aaa" "ls -la" "echo hello")"
     run_hi "$hist" '".*" 100'
-    assert_contains "$HI_STDOUT" "curl aaa" "curl matched" &&
-    assert_contains "$HI_STDOUT" "ls -la" "ls matched" &&
-    assert_contains "$HI_STDOUT" "echo hello" "echo matched"
-    # Count will exceed 3 because .* also matches session setup commands
-    local count
-    count="$(printf '%s\n' "$HI_STDOUT" | wc -l | tr -d ' ')"
-    [[ "$count" -gt 3 ]] || {
-        printf '    expected more than 3 matches (got %s) due to regex injection\n' "$count"
-        return 1
-    }
-}
-
-test_regex_pipe_needle_matches_multiple() {
-    # "curl|ls" as needle matches both curl and ls commands
-    local hist
-    hist="$(printf '%s\n' "curl aaa" "ls -la" "echo hello")"
+    assert_eq "" "$HI_STDOUT" "dot-star matches nothing literally"
     run_hi "$hist" '"curl|ls" 10'
-    assert_contains "$HI_STDOUT" "curl aaa" "curl matched" &&
-    assert_contains "$HI_STDOUT" "ls -la" "ls matched" &&
-    assert_not_contains "$HI_STDOUT" "echo" "echo not matched"
+    assert_eq "" "$HI_STDOUT" "alternation matches nothing literally"
+    run_hi "$hist" '"[cC]url" 10'
+    assert_eq "" "$HI_STDOUT" "bracket class matches nothing literally"
 }
 
-test_regex_bracket_needle() {
-    # "[cC]url" as needle matches curl and Curl
+test_dot_needle_not_wildcard() {
+    # "." is a regex "any char"; as a literal needle it must not match a
+    # differently-named command like "cat".
     local hist
-    hist="$(printf '%s\n' "curl aaa" "Curl bbb" "echo hello")"
-    run_hi "$hist" '"[cC]url" 10'
-    assert_contains "$HI_STDOUT" "curl aaa" "lowercase matched" &&
-    assert_contains "$HI_STDOUT" "Curl bbb" "uppercase matched"
+    hist="$(printf '%s\n' "cat file" "ls -la")"
+    run_hi "$hist" '"." 10'
+    assert_eq "" "$HI_STDOUT" "'.' does not wildcard-match cat"
 }
 
 test_history_with_tab_characters() {
@@ -88,9 +84,9 @@ run_edge_cases_tests() {
     run_test test_single_match_in_history
     run_test test_special_chars_in_command
     run_test test_command_with_dollar_sign
-    run_test test_regex_dot_star_needle_matches_everything
-    run_test test_regex_pipe_needle_matches_multiple
-    run_test test_regex_bracket_needle
+    run_test test_metachar_command_matched_literally
+    run_test test_regex_metachars_are_inert
+    run_test test_dot_needle_not_wildcard
     run_test test_history_with_tab_characters
     run_test test_needle_with_leading_whitespace
 }

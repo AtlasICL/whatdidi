@@ -8,6 +8,9 @@ set -euo pipefail
 
 # Constants
 WHATDIDI_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/whatdidi"
+INSTALL_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/install"
+# The exact line install adds to rc files and uninstall removes.
+SOURCE_LINE="source /usr/local/bin/whatdidi"
 PASS=0
 FAIL=0
 ERRORS=()
@@ -104,10 +107,13 @@ run_hi() {
     # $1 = newline-separated history lines to seed
     # $2 = full whatdidi invocation args (as a single string)
     # $3 = (optional) config file contents
+    # $4 = (optional) extra shell preamble injected before whatdidi is invoked
+    #      (e.g. 'export HISTTIMEFORMAT="%F %T "')
     # Sets: HI_STDOUT, HI_STDERR, HI_EXIT
     local hist_lines="$1"
     local wdi_args="$2"
     local config_contents="${3:-}"
+    local hi_preamble="${4:-}"
     local histfile="$TEST_TMPDIR/histfile"
     local stdout_f="$TEST_TMPDIR/stdout"
     local stderr_f="$TEST_TMPDIR/stderr"
@@ -126,6 +132,7 @@ HISTSIZE=10000
 HISTFILESIZE=10000
 history -c
 history -r "\$HISTFILE"
+$hi_preamble
 source "$WHATDIDI_SRC"
 whatdidi $wdi_args
 HEREDOC
@@ -160,10 +167,12 @@ run_hi_zsh() {
     # $1 = newline-separated history lines to seed
     # $2 = full whatdidi invocation args (as a single string)
     # $3 = (optional) config file contents
+    # $4 = (optional) extra shell preamble injected before whatdidi is invoked
     # Sets: HI_STDOUT, HI_STDERR, HI_EXIT
     local hist_lines="$1"
     local wdi_args="$2"
     local config_contents="${3:-}"
+    local hi_preamble="${4:-}"
     local histfile="$TEST_TMPDIR/histfile"
     local stdout_f="$TEST_TMPDIR/stdout"
     local stderr_f="$TEST_TMPDIR/stderr"
@@ -181,6 +190,7 @@ export HISTFILE="$histfile"
 HISTSIZE=10000
 SAVEHIST=10000
 fc -R "\$HISTFILE"
+$hi_preamble
 source "$WHATDIDI_SRC"
 whatdidi $wdi_args
 HEREDOC
@@ -188,6 +198,77 @@ HEREDOC
     set -e
     HI_STDOUT="$(cat "$stdout_f")"
     HI_STDERR="$(grep -v -E 'cannot set terminal|no job control|can.t find terminal' "$stderr_f" || true)"
+}
+
+# Tier 3: install / lifecycle runners
+#
+# These exercise the install script and the --update / --uninstall paths
+# without root. A no-op `sudo` shim is placed on PATH so the privileged
+# /usr/local/bin copy/remove is skipped while the rc-file wiring (which touches
+# the sandboxed TEST_HOME) runs for real.
+
+make_mock_sudo() {
+    # Create a no-op `sudo` in a temp bin dir and echo the dir path.
+    local dir="$TEST_TMPDIR/mockbin"
+    mkdir -p "$dir"
+    cat > "$dir/sudo" <<'EOF'
+#!/bin/sh
+# no-op sudo for tests: succeed without doing anything privileged
+exit 0
+EOF
+    chmod +x "$dir/sudo"
+    printf '%s' "$dir"
+}
+
+run_install() {
+    # Run the install script with HOME=TEST_HOME and a no-op sudo.
+    # Sets: INST_STDOUT, INST_STDERR, INST_EXIT
+    local mockbin stdout_f stderr_f
+    mockbin="$(make_mock_sudo)"
+    stdout_f="$TEST_TMPDIR/inst_out"
+    stderr_f="$TEST_TMPDIR/inst_err"
+
+    set +e
+    HOME="$TEST_HOME" PATH="$mockbin:$PATH" sh "$INSTALL_SRC" >"$stdout_f" 2>"$stderr_f"
+    INST_EXIT=$?
+    set -e
+    INST_STDOUT="$(cat "$stdout_f")"
+    INST_STDERR="$(cat "$stderr_f")"
+}
+
+run_wdi_stdin() {
+    # Source whatdidi under bash with HOME=TEST_HOME + a no-op sudo, feed $1 to
+    # stdin (for the --update/--uninstall confirmation prompt) and run $2.
+    # $3 = (optional) shell preamble injected after sourcing, before the call
+    #      (e.g. to shadow `command -v curl` and simulate curl being absent).
+    # Sets: SI_STDOUT, SI_STDERR, SI_EXIT
+    local stdin_data="$1" args="$2" preamble="${3:-}"
+    local mockbin stdout_f stderr_f
+    mockbin="$(make_mock_sudo)"
+    stdout_f="$TEST_TMPDIR/si_out"
+    stderr_f="$TEST_TMPDIR/si_err"
+
+    set +e
+    printf '%s\n' "$stdin_data" | \
+        HOME="$TEST_HOME" PATH="$mockbin:$PATH" bash --norc --noprofile -c '
+            source "'"$WHATDIDI_SRC"'"
+            '"$preamble"'
+            whatdidi '"$args"'
+        ' >"$stdout_f" 2>"$stderr_f"
+    SI_EXIT=$?
+    set -e
+    SI_STDOUT="$(cat "$stdout_f")"
+    SI_STDERR="$(cat "$stderr_f")"
+}
+
+# Count exact (whole-line) occurrences of a string in a file (0 if absent).
+# grep -c prints the count on stdout but exits 1 when the count is 0, so we
+# capture stdout and ignore the exit status.
+count_lines_matching() {
+    local file="$1" needle="$2" n
+    [[ -f "$file" ]] || { printf '0'; return; }
+    n="$(grep -cxF "$needle" "$file" 2>/dev/null)"
+    printf '%s' "${n:-0}"
 }
 
 # Summary

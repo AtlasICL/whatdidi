@@ -11,11 +11,15 @@ source "$SCRIPT_DIR/test_args.sh"
 source "$SCRIPT_DIR/test_set_default.sh"
 source "$SCRIPT_DIR/test_config.sh"
 source "$SCRIPT_DIR/test_search.sh"
+source "$SCRIPT_DIR/test_histtimeformat.sh"
 source "$SCRIPT_DIR/test_sudo.sh"
 source "$SCRIPT_DIR/test_compound.sh"
 source "$SCRIPT_DIR/test_self_filter.sh"
 source "$SCRIPT_DIR/test_word_boundary.sh"
+source "$SCRIPT_DIR/test_literal.sh"
 source "$SCRIPT_DIR/test_edge_cases.sh"
+source "$SCRIPT_DIR/test_install.sh"
+source "$SCRIPT_DIR/test_lifecycle.sh"
 source "$SCRIPT_DIR/test_integration.sh"
 source "$SCRIPT_DIR/test_zsh.sh"
 
@@ -33,6 +37,8 @@ run_config_tests
 printf '\n'
 run_search_tests
 printf '\n'
+run_histtimeformat_tests
+printf '\n'
 run_sudo_tests
 printf '\n'
 run_compound_tests
@@ -41,7 +47,13 @@ run_self_filter_tests
 printf '\n'
 run_word_boundary_tests
 printf '\n'
+run_literal_tests
+printf '\n'
 run_edge_cases_tests
+printf '\n'
+run_install_tests
+printf '\n'
+run_lifecycle_tests
 printf '\n'
 run_integration_tests
 printf '\n'

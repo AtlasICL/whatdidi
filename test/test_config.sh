@@ -25,25 +25,28 @@ test_no_config_defaults_to_one() {
     assert_line_count 1 "$HI_STDOUT" "no config means default 1"
 }
 
-test_config_invalid_non_integer_rejected() {
+test_config_invalid_non_integer_falls_back() {
     local hist
     hist="$(printf '%s\n' "curl aaa" "curl bbb")"
     run_hi "$hist" "curl" "default_count=abc"
-    assert_contains "$HI_STDERR" "nonzero positive int" "bad config caught"
+    assert_contains "$HI_STDERR" "invalid default_count" "bad config warned" &&
+    assert_line_count 1 "$HI_STDOUT" "falls back to default 1"
 }
 
-test_config_invalid_zero_rejected() {
+test_config_invalid_zero_falls_back() {
     local hist
     hist="$(printf '%s\n' "curl aaa" "curl bbb")"
     run_hi "$hist" "curl" "default_count=0"
-    assert_contains "$HI_STDERR" "nonzero positive int" "zero config caught"
+    assert_contains "$HI_STDERR" "invalid default_count" "zero config warned" &&
+    assert_line_count 1 "$HI_STDOUT" "falls back to default 1"
 }
 
-test_config_invalid_negative_rejected() {
+test_config_invalid_negative_falls_back() {
     local hist
     hist="$(printf '%s\n' "curl aaa" "curl bbb")"
     run_hi "$hist" "curl" "default_count=-5"
-    assert_contains "$HI_STDERR" "nonzero positive int" "negative config caught"
+    assert_contains "$HI_STDERR" "invalid default_count" "negative config warned" &&
+    assert_line_count 1 "$HI_STDOUT" "falls back to default 1"
 }
 
 test_config_explicit_count_bypasses_bad_config() {
@@ -53,15 +56,62 @@ test_config_explicit_count_bypasses_bad_config() {
     assert_line_count 2 "$HI_STDOUT" "explicit count overrides bad config"
 }
 
+test_config_empty_value_falls_back() {
+    local hist
+    hist="$(printf '%s\n' "curl aaa" "curl bbb")"
+    run_hi "$hist" "curl" "default_count="
+    assert_contains "$HI_STDERR" "invalid default_count" "empty value warned" &&
+    assert_line_count 1 "$HI_STDOUT" "empty value falls back to 1"
+}
+
+test_config_float_value_falls_back() {
+    local hist
+    hist="$(printf '%s\n' "curl aaa" "curl bbb")"
+    run_hi "$hist" "curl" "default_count=2.5"
+    assert_contains "$HI_STDERR" "invalid default_count" "float value warned" &&
+    assert_line_count 1 "$HI_STDOUT" "float value falls back to 1"
+}
+
+test_config_large_valid_value_used() {
+    local hist
+    hist="$(printf '%s\n' "curl a" "curl b" "curl c" "curl d" "curl e")"
+    run_hi "$hist" "curl" "default_count=100"
+    assert_line_count 5 "$HI_STDOUT" "large default returns all available matches" &&
+    assert_not_contains "$HI_STDERR" "invalid default_count" "valid config produces no warning"
+}
+
+test_config_last_default_count_line_wins() {
+    # The config reader overwrites on each matching line, so the last one wins.
+    local hist config
+    hist="$(printf '%s\n' "curl a" "curl b" "curl c" "curl d")"
+    config="$(printf '%s\n' "default_count=1" "default_count=3")"
+    run_hi "$hist" "curl" "$config"
+    assert_line_count 3 "$HI_STDOUT" "last default_count line takes effect"
+}
+
+test_config_unrelated_lines_ignored() {
+    local hist config
+    hist="$(printf '%s\n' "curl a" "curl b" "curl c")"
+    config="$(printf '%s\n' "# a comment" "some_other_key=99" "default_count=2")"
+    run_hi "$hist" "curl" "$config"
+    assert_line_count 2 "$HI_STDOUT" "only default_count is read; other lines ignored" &&
+    assert_not_contains "$HI_STDERR" "invalid default_count" "no warning for well-formed config with extra lines"
+}
+
 run_config_tests() {
     printf '\033[1mConfig sourcing\033[0m\n'
     run_test test_config_default_count_used
     run_test test_config_overridden_by_explicit_count
     run_test test_no_config_defaults_to_one
-    run_test test_config_invalid_non_integer_rejected
-    run_test test_config_invalid_zero_rejected
-    run_test test_config_invalid_negative_rejected
+    run_test test_config_invalid_non_integer_falls_back
+    run_test test_config_invalid_zero_falls_back
+    run_test test_config_invalid_negative_falls_back
     run_test test_config_explicit_count_bypasses_bad_config
+    run_test test_config_empty_value_falls_back
+    run_test test_config_float_value_falls_back
+    run_test test_config_large_valid_value_used
+    run_test test_config_last_default_count_line_wins
+    run_test test_config_unrelated_lines_ignored
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
