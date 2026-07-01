@@ -3,15 +3,34 @@ name: Tests
 on:
   push:
     branches: [main]
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Run every OS to completion even if one fails, so a platform-specific
+      # break is always visible rather than masked by fail-fast cancellation.
+      fail-fast: false
+      matrix:
+        # ubuntu = GNU userland, macos = BSD userland + system zsh. Together
+        # they guard against GNU-only assumptions (e.g. `tac`) and exercise the
+        # real zsh code path on both platforms.
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install zsh
+      # macOS ships zsh already; only Linux needs it installed.
+      - name: Install zsh (Linux)
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y zsh
+
+      - name: Show shell versions
+        run: |
+          bash --version | head -1
+          zsh --version
 
       - name: Run tests
         run: bash test/run_all.sh

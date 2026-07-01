@@ -64,6 +64,20 @@ test_duplicate_entries_all_returned() {
     assert_line_count 3 "$HI_STDOUT" "all 3 duplicates returned"
 }
 
+test_newest_first_over_many_entries() {
+    # Guards the history reversal (awk newest-first, replacing GNU `tac`):
+    # seed 20 matches and require the full result in strict most-recent-first
+    # order, not just the first line.
+    local hist expected i
+    local lines=() exp=()
+    for i in $(seq 1 20); do lines+=("curl req$i"); done
+    hist="$(printf '%s\n' "${lines[@]}")"
+    for i in $(seq 20 -1 1); do exp+=("curl req$i"); done
+    expected="$(printf '%s\n' "${exp[@]}")"
+    run_hi "$hist" "curl 20"
+    assert_eq "$expected" "$HI_STDOUT" "20 matches returned newest-first"
+}
+
 test_search_exit_code_on_match() {
     local hist
     hist="$(printf '%s\n' "curl aaa" "echo hello")"
@@ -97,6 +111,7 @@ run_search_tests() {
     run_test test_most_recent_first
     run_test test_order_preserved_across_all
     run_test test_duplicate_entries_all_returned
+    run_test test_newest_first_over_many_entries
     run_test test_search_exit_code_on_match
     run_test test_search_exit_code_on_no_match
     run_test test_search_exit_code_when_count_unmet

@@ -138,8 +138,9 @@ HELP
     else
       # Clear HISTTIMEFORMAT for this call so `history` emits "<n>  <command>"
       # without a timestamp column (which the sed below would otherwise leave
-      # in, defeating the match). newest first via tac.
-      HISTTIMEFORMAT= builtin history | tac
+      # in, defeating the match). Reverse to newest-first with awk rather than
+      # `tac`, which is GNU-only and absent on macOS/BSD.
+      HISTTIMEFORMAT= builtin history | awk '{ a[NR] = $0 } END { for (i = NR; i >= 1; i--) print a[i] }'
     fi
   } | sed -E 's/^[[:space:]]*[0-9]+[[:space:]]+//' | \
   while IFS= read -r line; do

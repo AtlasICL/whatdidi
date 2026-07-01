@@ -51,6 +51,17 @@ test_htf_no_timestamp_leaks_into_output() {
     assert_eq "curl target" "$HI_STDOUT" "output is the bare command, no timestamp"
 }
 
+test_htf_order_preserved_newest_first() {
+    # Reversal (awk) + timestamp-clearing must compose: results still come back
+    # most-recent-first when HISTTIMEFORMAT is set.
+    local hist
+    hist="$(printf '%s\n' "curl first" "curl second" "curl third")"
+    run_hi "$hist" "curl 3" "" "$_HTF_STANDARD"
+    local expected
+    expected="$(printf '%s\n' "curl third" "curl second" "curl first")"
+    assert_eq "$expected" "$HI_STDOUT" "newest-first order preserved under HISTTIMEFORMAT"
+}
+
 test_htf_sudo_still_matches() {
     local hist
     hist="$(printf '%s\n' "echo hi" "sudo apt update")"
@@ -65,6 +76,7 @@ run_histtimeformat_tests() {
     run_test test_htf_epoch_format_matches
     run_test test_htf_count_still_respected
     run_test test_htf_no_timestamp_leaks_into_output
+    run_test test_htf_order_preserved_newest_first
     run_test test_htf_sudo_still_matches
 }
 
