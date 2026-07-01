@@ -6,6 +6,7 @@
 #      (installs the whatdidi file sitting next to this script)
 set -eu
 
+# ---- Helper functions --------------------------------------------------------
 INFO_COLOR="\033[92m"       # green
 SUCCESS_COLOR="\033[35m"    # purple
 IMPORTANT_COLOR="\033[31m"  # red
@@ -20,6 +21,7 @@ bakinfo() { printf "${BAKINFO_COLOR}[INFO] %s${RESET}\n" "$*"; }
 success() { printf "\n${SUCCESS_COLOR}[OK  ] %s${RESET}\n" "$*"; }
 warn() { printf "\n${ERROR_COLOR}[WARN] %s${RESET}\n" "$*"; }
 error() { printf "\n${ERROR_COLOR}[ERR ] %s${RESET}\n" "$*"; }
+# ------------------------------------------------------------------------------
 
 REPO_RAW="https://raw.githubusercontent.com/AtlasICL/whatdidi/main"
 INSTALL_PATH="/usr/local/bin/whatdidi"

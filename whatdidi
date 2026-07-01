@@ -1,6 +1,23 @@
 # Install: 1) add this file to /usr/local/bin/whatdidi
 #          2) add `source /usr/local/bin/whatdidi` to ~/.bashrc and/or ~/.zshrc
 
+# ---- Helper functions --------------------------------------------------------
+INFO_COLOR="\033[92m"       # green
+SUCCESS_COLOR="\033[35m"    # purple
+IMPORTANT_COLOR="\033[31m"  # red
+ERROR_COLOR="\033[31m"      # red
+BAKINFO_COLOR="\033[94m"    # blue
+BG_NAVY="\033[48;5;19m"     # dark blue (for highlighting)
+RESET="\033[0m"
+
+info() { printf "\n${INFO_COLOR}[INFO] %s${RESET}\n" "$*"; }
+importantinfo() { printf "\n${IMPORTANT_COLOR}[OK  ] %s${RESET}\n" "$*"; }
+bakinfo() { printf "${BAKINFO_COLOR}[INFO] %s${RESET}\n" "$*"; }
+success() { printf "\n${SUCCESS_COLOR}[OK  ] %s${RESET}\n" "$*"; }
+warn() { printf "\n${ERROR_COLOR}[WARN] %s${RESET}\n" "$*"; }
+error() { printf "\n${ERROR_COLOR}[ERR ] %s${RESET}\n" "$*"; }
+# ------------------------------------------------------------------------------
+
 whatdidi() {
   local needle count line default_count _wdi_conf _wdi_line
   _wdi_conf="${HOME}/.config/whatdidi/config"
@@ -33,18 +50,17 @@ Options:
   --set-default <n>   Set the default number of results to show
                       when count is not specified. Persists across
                       sessions (~/.config/whatdidi/config).
-  --update            Reinstall whatdidi with the latest version
-                      from the repository.
+  --update            Reinstall whatdidi with the latest version.
+  --uninstall         Uninstall whatdidi from your system.
   -v, --version       Show version and author information.
   -h, --help          Show this help message.
 
 Examples:
   whatdidi curl                # last curl command you ran
   whatdidi mvn 3               # last 3 mvn commands
-  whatdidi "git push" 2        # last 2 git push commands
-  whatdidi --set-default 5     # always show 5 results by default
+  whatdidi "git switch" 2      # last 2 git switch commands
 
-Commands prefixed with sudo are matched automatically.
+Commands prefixed with sudo are also matched.
 HELP
     return 0
   fi
@@ -54,9 +70,45 @@ HELP
       echo "whatdidi: curl is required to update but was not found" >&2
       return 1
     fi
+    local reply
+    read -r -p "Update whatdidi to the latest version? [Y/n] " reply
+    reply="${reply:-Y}"
+    if [[ ! "$reply" =~ ^[Yy]$ ]]; then
+      echo "whatdidi: update cancelled"
+      return 0
+    fi
     echo "whatdidi: fetching the latest version ..."
     curl -fsSL https://raw.githubusercontent.com/AtlasICL/whatdidi/main/install | sh
     return $?
+  fi
+
+  if [[ "$needle" == "--uninstall" ]]; then
+    local reply
+    read -r -p "Uninstall whatdidi? This will remove the tool and your config. [Y/n] " reply
+    reply="${reply:-Y}"
+    if [[ ! "$reply" =~ ^[Yy]$ ]]; then
+      echo "whatdidi: uninstall cancelled"
+      return 0
+    fi
+    local install_path="/usr/local/bin/whatdidi"
+    local source_line="source /usr/local/bin/whatdidi"
+    local conf_dir="${HOME}/.config/whatdidi"
+    if [[ -f "$install_path" ]]; then
+      sudo rm -f "$install_path"
+      echo "whatdidi: removed $install_path"
+    fi
+    for rc in "${HOME}/.bashrc" "${HOME}/.zshrc"; do
+      if [[ -f "$rc" ]] && grep -qxF "$source_line" "$rc" 2>/dev/null; then
+        grep -vxF "$source_line" "$rc" > "${rc}.wdi_tmp" && mv "${rc}.wdi_tmp" "$rc"
+        echo "whatdidi: removed source line from $rc"
+      fi
+    done
+    if [[ -d "$conf_dir" ]]; then
+      rm -rf "$conf_dir"
+      echo "whatdidi: removed config directory $conf_dir"
+    fi
+    echo "whatdidi: uninstalled. You may restart your terminal to complete removal."
+    return 0
   fi
 
   if [[ "$needle" == "--set-default" ]]; then
