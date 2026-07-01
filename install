@@ -7,20 +7,18 @@
 set -eu
 
 # ---- Helper functions --------------------------------------------------------
-INFO_COLOR="\033[92m"       # green
-SUCCESS_COLOR="\033[35m"    # purple
-IMPORTANT_COLOR="\033[31m"  # red
-ERROR_COLOR="\033[31m"      # red
-BAKINFO_COLOR="\033[94m"    # blue
-BG_NAVY="\033[48;5;19m"     # dark blue (for highlighting)
+BLUE="\033[94m"
+BACKGROUND_NAVY="\033[48;5;19m"
+GREEN="\033[92m"
+ORANGE="\033[38;5;208m"
+PURPLE="\033[35m"
+RED="\033[31m"
 RESET="\033[0m"
 
-info() { printf "\n${INFO_COLOR}[INFO] %s${RESET}\n" "$*"; }
-importantinfo() { printf "\n${IMPORTANT_COLOR}[OK  ] %s${RESET}\n" "$*"; }
-bakinfo() { printf "${BAKINFO_COLOR}[INFO] %s${RESET}\n" "$*"; }
-success() { printf "\n${SUCCESS_COLOR}[OK  ] %s${RESET}\n" "$*"; }
-warn() { printf "\n${ERROR_COLOR}[WARN] %s${RESET}\n" "$*"; }
-error() { printf "\n${ERROR_COLOR}[ERR ] %s${RESET}\n" "$*"; }
+print_info() { printf "\n${BLUE}[INFO] %s${RESET}\n" "$*"; }
+print_success() { printf "\n${GREEN}[OK] %s${RESET}\n" "$*"; }
+print_warning() { printf "\n${ORANGE}[WARNING] %s${RESET}\n" "$*"; }
+print_error() { printf "\n${RED}[ERROR] %s${RESET}\n" "$*"; }
 # ------------------------------------------------------------------------------
 
 REPO_RAW="https://raw.githubusercontent.com/AtlasICL/whatdidi/main"
@@ -35,20 +33,25 @@ case "$0" in
     */*) script_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd)" ;;
 esac
 
-info "Installing whatdidi to $INSTALL_PATH ..."
+if ! sudo -v 2>/dev/null; then
+  print_error "Installation requires sudo privileges."
+  exit 1
+fi
+
+print_info "Installing whatdidi to $INSTALL_PATH ..."
 if [ -n "$script_dir" ] && [ -f "$script_dir/whatdidi" ]; then
-    bakinfo "Using local copy: $script_dir/whatdidi"
+    print_info "Using local copy: $script_dir/whatdidi"
     sudo cp "$script_dir/whatdidi" "$INSTALL_PATH"
 else
     if ! command -v curl >/dev/null 2>&1; then
-        error "curl is required to download whatdidi but was not found."
+        print_error "curl is required to download whatdidi but was not found."
         exit 1
     fi
-    bakinfo "Downloading whatdidi from $REPO_RAW/whatdidi ..."
+    print_info "Downloading whatdidi from $REPO_RAW/whatdidi ..."
     tmp="$(mktemp)"
     trap 'rm -f "$tmp"' EXIT INT TERM
     if ! curl -fsSL "$REPO_RAW/whatdidi" -o "$tmp"; then
-        error "Failed to download whatdidi from $REPO_RAW/whatdidi"
+        print_error "Failed to download whatdidi from $REPO_RAW/whatdidi"
         exit 1
     fi
     sudo cp "$tmp" "$INSTALL_PATH"
@@ -62,9 +65,9 @@ add_source_line() {
     if ! grep -qxF "$SOURCE_LINE" "$rc" 2>/dev/null; then
         echo "" >> "$rc"
         echo "$SOURCE_LINE" >> "$rc"
-        info "Added source line to $rc"
+        print_info "Added source line to $rc"
     else
-        info "$rc already sources whatdidi - skipping"
+        print_info "$rc already sources whatdidi - skipping"
     fi
 }
 
@@ -72,4 +75,4 @@ add_source_line() {
 add_source_line "$HOME/.bashrc"
 add_source_line "$HOME/.zshrc"
 
-importantinfo "Done! Restart your terminal, or run: source ~/.bashrc  (bash)  /  source ~/.zshrc  (zsh)"
+print_success "Done! Restart your terminal to use whatdidi"
