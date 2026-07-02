@@ -15,7 +15,7 @@ Compatible with bash and zsh.
 #### Search for the last command you ran:
 ```
 whatdidi curl
-> curl -s https://sh.rustup.rs | bat
+> curl -s https://sh.rustup.rs | sh
 ```
 
 #### Search for the last **n** commands you ran:
@@ -42,12 +42,12 @@ whatdidi rm 2
 
 #### Return only unique results with `-u` / `--unique`:
 ```
-whatdidi -u git 5
+whatdidi -u git
 > git push origin main
-> git commit -m "wip"
+> git commit -m "feat: performance testing framework"
 > git status
 ```
-The flag can go anywhere, e.g. `whatdidi git 5 -u`. With `-u`, the count is the number of *unique* commands to show; byte-identical commands are collapsed (so `rm foo` and `sudo rm foo` remain distinct). When unique is the default (via `--set-default-unique true`), pass `--no-unique` to return all results for a single search.
+The flag can go anywhere, e.g. `whatdidi -u git`. When unique is the default (see [below](#see-only-unique-results-by-default)), pass `--no-unique` to also return non-unique results.
 
 #### Set the default number of results:
 ```
@@ -55,11 +55,10 @@ whatdidi --set-default-count 3
 ```
 This preference is stored in `~/.config/whatdidi/config`
 
-#### Set whether results are unique by default:
+#### See only unique results by default:
 ```
 whatdidi --set-default-unique true
 ```
-When set to `true`, every search deduplicates results as if `-u` were always passed. Stored in the same `~/.config/whatdidi/config`. Use `false` to turn it back off.
 
 #### Update to the latest version:
 ```
