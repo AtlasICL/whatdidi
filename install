@@ -7,13 +7,27 @@
 set -eu
 
 # ---- Helper functions --------------------------------------------------------
-BLUE="\033[94m"
-BACKGROUND_NAVY="\033[48;5;19m"
-GREEN="\033[92m"
-ORANGE="\033[38;5;208m"
-PURPLE="\033[35m"
-RED="\033[31m"
-RESET="\033[0m"
+# Only emit ANSI color escapes when stdout is an interactive terminal. Under the
+# primary documented usage (`curl ... | sh`) or when the output is redirected to
+# a file/log, stdout is not a tty and the raw escapes would appear as literal
+# garbage — so blank the color vars in that case.
+if [ -t 1 ]; then
+  BLUE="\033[94m"
+  BACKGROUND_NAVY="\033[48;5;19m"
+  GREEN="\033[92m"
+  ORANGE="\033[38;5;208m"
+  PURPLE="\033[35m"
+  RED="\033[31m"
+  RESET="\033[0m"
+else
+  BLUE=""
+  BACKGROUND_NAVY=""
+  GREEN=""
+  ORANGE=""
+  PURPLE=""
+  RED=""
+  RESET=""
+fi
 
 print_info() { printf "\n${BLUE}[INFO] %s${RESET}\n" "$*"; }
 print_success() { printf "\n${GREEN}[OK] %s${RESET}\n" "$*"; }

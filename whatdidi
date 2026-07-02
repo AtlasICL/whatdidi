@@ -124,7 +124,9 @@ HELP
     done
     # The config dir is independent of the rc files, so clean it up even if an
     # rc rewrite failed above — but still surface the failure below.
-    if [[ -d "$conf_dir" ]]; then
+    # Guard on a non-empty $HOME: if HOME were empty/unset, conf_dir would be
+    # "/.config/whatdidi" (a system path), and `rm -rf` must never target that.
+    if [[ -n "$HOME" && -d "$conf_dir" ]]; then
       rm -rf "$conf_dir"
       echo "whatdidi: removed config directory $conf_dir"
     fi
@@ -150,7 +152,34 @@ HELP
       return 2
     fi
     mkdir -p "${HOME}/.config/whatdidi"
-    printf 'default_count=%s\n' "$new_count" > "$_wdi_conf"
+    # Preserve any unrelated config keys: read the existing file, drop every
+    # existing default_count= line, keep everything else verbatim, then append
+    # the new default_count line. A plain `> "$_wdi_conf"` would truncate the
+    # whole file and silently discard other keys. Build the new content in a temp
+    # file, then copy it back with `cat >` rather than `mv` so a symlinked config
+    # (common with dotfile managers) is edited in place — `mv` would replace the
+    # symlink with a regular file and leave the real repo-managed target stale.
+    # This mirrors the write-through the uninstall rc-rewrite deliberately uses.
+    # The read loop mirrors the portable `read` pattern used to load the config
+    # near the top of this function (works identically in bash 3.2 and zsh).
+    local _wdi_tmp="${HOME}/.config/whatdidi/config.wdi_tmp.$$"
+    : > "$_wdi_tmp"
+    if [[ -f "$_wdi_conf" ]]; then
+      while IFS= read -r _wdi_line || [[ -n "$_wdi_line" ]]; do
+        [[ "$_wdi_line" == default_count=* ]] && continue
+        printf '%s\n' "$_wdi_line" >> "$_wdi_tmp"
+      done < "$_wdi_conf"
+    fi
+    printf 'default_count=%s\n' "$new_count" >> "$_wdi_tmp"
+    # Only drop the temp file and claim success if the write-through actually
+    # completed: if `cat >` fails mid-write (e.g. disk full) the temp copy is the
+    # only intact version, so keep it and report the failure to stderr.
+    if cat "$_wdi_tmp" > "$_wdi_conf"; then
+      rm -f "$_wdi_tmp"
+    else
+      echo "whatdidi: failed to write $_wdi_conf" >&2
+      return 1
+    fi
     echo "whatdidi: default count set to $new_count"
     return 0
   fi

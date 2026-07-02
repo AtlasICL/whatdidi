@@ -66,6 +66,18 @@ test_install_idempotent_reports_skip() {
     assert_contains "$INST_STDOUT$INST_STDERR" "already sources whatdidi" "second run reports skip"
 }
 
+test_install_no_ansi_escapes_when_not_tty() {
+    # BUG-7: run_install captures stdout/stderr to files (not a tty), so the
+    # install script must emit NO raw ANSI escape sequences. Colors are gated on
+    # `[ -t 1 ]`; when stdout is redirected the color vars are blank, so no ESC
+    # (0x1b / \033) byte should ever reach the captured output.
+    run_install
+    local esc
+    esc="$(printf '\033')"
+    assert_not_contains "$INST_STDOUT" "$esc" "no raw ESC sequence in stdout" &&
+    assert_not_contains "$INST_STDERR" "$esc" "no raw ESC sequence in stderr"
+}
+
 run_install_tests() {
     printf '\033[1mInstall (rc wiring)\033[0m\n'
     run_test test_install_creates_bashrc_when_neither_exists
@@ -75,6 +87,7 @@ run_install_tests() {
     run_test test_install_wires_both_when_both_exist
     run_test test_install_idempotent_no_duplicate
     run_test test_install_idempotent_reports_skip
+    run_test test_install_no_ansi_escapes_when_not_tty
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

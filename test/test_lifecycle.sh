@@ -128,6 +128,43 @@ test_uninstall_reports_error_on_unwritable_rc() {
         "does not print the success message on partial failure"
 }
 
+test_uninstall_empty_home_never_targets_system_paths() {
+    # BUG-5 (defense-in-depth guard, NOT a strict red-green regression lock):
+    # when HOME is empty, conf_dir resolves to "/.config/whatdidi" and the rc
+    # paths to "/.bashrc" / "/.zshrc" — all bare-`/`-rooted system paths. The
+    # `[[ -n "$HOME" && -d "$conf_dir" ]]` guard adds a belt-and-suspenders
+    # `-n "$HOME"` check so uninstall never issues a destructive op against one.
+    #
+    # Why this is NOT a strict lock against the pre-fix (unguarded) code: the
+    # deletion is ALSO gated by the pre-existing `-d "$conf_dir"` precheck, and
+    # "/.config/whatdidi" cannot be created inside the hermetic sandbox (it is a
+    # real system path). So even without the `-n "$HOME"` guard the `rm -rf`
+    # would be skipped here — a red-against-pre-fix assertion is unachievable
+    # without touching the real filesystem. Instead we assert the honest,
+    # verifiable property: under empty HOME, uninstall exits cleanly and `rm` is
+    # never invoked on any bare-`/`-rooted $HOME-derived path. The mock `rm`
+    # logger records every invocation's args, so a future regression that DID
+    # fire `rm` on such a path (e.g. by dropping the `-d` precheck too) would be
+    # caught here.
+    local rm_log="$TEST_TMPDIR/rm_calls"
+    : > "$rm_log"
+    local shadow="rm() { printf '%s\n' \"\$*\" >> '$rm_log'; }"
+    run_wdi_stdin_emptyhome "Y" "--uninstall" "$shadow"
+    local rm_calls
+    rm_calls="$(cat "$rm_log")"
+    assert_eq 0 "$SI_EXIT" "uninstall exits cleanly with empty HOME" &&
+    assert_not_contains "$SI_STDOUT" "removed config directory" \
+        "config-removal branch is skipped when HOME is empty" &&
+    assert_not_contains "$rm_calls" "/.config/whatdidi" \
+        "rm is never invoked on the exact \$HOME-derived config path" &&
+    assert_not_contains "$rm_calls" "/.config/" \
+        "rm is never invoked on any bare-/-rooted .config path" &&
+    assert_not_contains "$rm_calls" "/.bashrc" \
+        "rm is never invoked on the bare-/-rooted .bashrc path" &&
+    assert_not_contains "$rm_calls" "/.zshrc" \
+        "rm is never invoked on the bare-/-rooted .zshrc path"
+}
+
 test_uninstall_preserves_symlinked_rc() {
     # M3: when the rc file is a symlink (common with dotfile managers) the edit
     # must happen in place via `cat >` so the symlink survives and the real
@@ -198,6 +235,7 @@ run_lifecycle_tests() {
     run_test test_uninstall_no_rc_files_still_clean
     run_test test_uninstall_rc_with_only_source_line
     run_test test_uninstall_reports_error_on_unwritable_rc
+    run_test test_uninstall_empty_home_never_targets_system_paths
     run_test test_uninstall_preserves_symlinked_rc
 
     # zsh confirmation-path counterparts — skip gracefully without zsh.

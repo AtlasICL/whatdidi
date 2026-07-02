@@ -269,6 +269,31 @@ run_wdi_stdin() {
     SI_STDERR="$(cat "$stderr_f")"
 }
 
+run_wdi_stdin_emptyhome() {
+    # Like run_wdi_stdin but exports an EMPTY HOME, to exercise the
+    # $HOME-derived `rm -rf "$conf_dir"` guard in --uninstall (BUG-5). With an
+    # empty HOME, conf_dir resolves to "/.config/whatdidi" (a system path) and
+    # must never be removed. Same result vars as run_wdi_stdin: SI_STDOUT,
+    # SI_STDERR, SI_EXIT.
+    local stdin_data="$1" args="$2" preamble="${3:-}"
+    local mockbin stdout_f stderr_f
+    mockbin="$(make_mock_sudo)"
+    stdout_f="$TEST_TMPDIR/si_out"
+    stderr_f="$TEST_TMPDIR/si_err"
+
+    set +e
+    printf '%s\n' "$stdin_data" | \
+        HOME="" PATH="$mockbin:$PATH" bash --norc --noprofile -c '
+            source "'"$WHATDIDI_SRC"'"
+            '"$preamble"'
+            whatdidi '"$args"'
+        ' >"$stdout_f" 2>"$stderr_f"
+    SI_EXIT=$?
+    set -e
+    SI_STDOUT="$(cat "$stdout_f")"
+    SI_STDERR="$(cat "$stderr_f")"
+}
+
 run_wdi_stdin_zsh() {
     # zsh counterpart of run_wdi_stdin: exercises the --update/--uninstall
     # confirmation prompts under zsh, which is where the H1 `read -p` bug hid
