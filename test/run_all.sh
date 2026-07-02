@@ -11,6 +11,7 @@ source "$SCRIPT_DIR/test_args.sh"
 source "$SCRIPT_DIR/test_set_default.sh"
 source "$SCRIPT_DIR/test_config.sh"
 source "$SCRIPT_DIR/test_search.sh"
+source "$SCRIPT_DIR/test_unique.sh"
 source "$SCRIPT_DIR/test_histtimeformat.sh"
 source "$SCRIPT_DIR/test_sudo.sh"
 source "$SCRIPT_DIR/test_compound.sh"
@@ -36,6 +37,8 @@ printf '\n'
 run_config_tests
 printf '\n'
 run_search_tests
+printf '\n'
+run_unique_tests
 printf '\n'
 run_histtimeformat_tests
 printf '\n'

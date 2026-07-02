@@ -4,6 +4,7 @@
 
 whatdidi() {
   local needle count line default_count _wdi_conf _wdi_line stripped desudo
+  local unique seen sep _wdi_arg _wdi_i _wdi_n
   _wdi_conf="${HOME}/.config/whatdidi/config"
   default_count=1
   if [[ -f "$_wdi_conf" ]]; then
@@ -21,6 +22,27 @@ whatdidi() {
     echo "whatdidi: invalid default_count in $_wdi_conf; using 1" >&2
     default_count=1
   fi
+  # Parse an optional -u/--unique flag out of the argument list before reading
+  # positional args, so it can appear anywhere: `whatdidi -u curl 3`,
+  # `whatdidi curl 3 -u`, and `whatdidi curl -u 2` are all equivalent. Rotate the
+  # positional params — shift each arg off the front and, unless it's the flag,
+  # re-append it to the end — so after $# passes the non-flag args are back in
+  # their original order with the flag removed. This is a fully portable rebuild
+  # (no arrays, which bash 3.2 lacks and zsh spells differently) that preserves
+  # arg boundaries, so multi-word needles like "git push" survive intact.
+  unique=0
+  _wdi_n=$#
+  _wdi_i=0
+  while [[ "$_wdi_i" -lt "$_wdi_n" ]]; do
+    _wdi_arg="$1"
+    shift
+    case "$_wdi_arg" in
+      -u|--unique) unique=1 ;;
+      *) set -- "$@" "$_wdi_arg" ;;
+    esac
+    _wdi_i=$((_wdi_i+1))
+  done
+
   needle="${1:-}"
   count="${2:-$default_count}"
 
@@ -33,7 +55,7 @@ whatdidi() {
   if [[ "$needle" == "--help" || "$needle" == "-h" ]]; then
     cat <<'HELP'
 Usage:
-  whatdidi <command> [count]
+  whatdidi [-u] <command> [count]
 
 Arguments:
   command   The command name to search for in your shell history.
@@ -46,6 +68,7 @@ Options:
                       sessions (~/.config/whatdidi/config).
   --update            Reinstall whatdidi with the latest version.
   --uninstall         Uninstall whatdidi from your system.
+  -u, --unique        Only return unique (deduplicated) results.
   -v, --version       Show version and author information.
   -h, --help          Show this help message.
 
@@ -53,6 +76,7 @@ Examples:
   whatdidi curl                # last curl command you ran
   whatdidi mvn 3               # last 3 mvn commands
   whatdidi "git switch" 2      # last 2 git switch commands
+  whatdidi -u git 5            # last 5 distinct git commands
 
 Commands prefixed with sudo are also matched.
 HELP
@@ -204,6 +228,15 @@ HELP
     builtin history -n 2>/dev/null || true
   fi
 
+  # Dedup state for -u/--unique. `seen` is a newline-joined set of already-printed
+  # lines; a newline separator is safe because each $line read below is a single
+  # history line and so can never contain a newline itself — no line can straddle
+  # a separator and produce a false match. Membership is tested with a portable
+  # `case` glob rather than an associative array (unavailable in bash 3.2, spelled
+  # differently in zsh).
+  seen=""
+  sep=$'\n'
+
   # Walk history from most-recent to oldest and print the first N matches.
   # Both shells emit "<number>  <command>"; the sed strips the leading number.
   {
@@ -237,6 +270,17 @@ HELP
 
     if [[ "$stripped" == "$needle" || "$stripped" == "$needle"[[:space:]]* || \
           "$desudo"  == "$needle" || "$desudo"  == "$needle"[[:space:]]* ]]; then
+      # With -u, collapse byte-identical printed lines: skip this match if an
+      # identical line was already printed. "$line" is quoted inside the pattern
+      # so it matches LITERALLY (command names may contain glob metacharacters
+      # like g++ or ./foo); only the surrounding $sep is glob. count is decremented
+      # only on an actual print, so it means "up to N unique matches."
+      if [[ "$unique" -eq 1 ]]; then
+        case "$sep$seen$sep" in
+          *"$sep$line$sep"*) continue ;;
+        esac
+        seen="$seen$sep$line"
+      fi
       printf '%s\n' "$line"
       count=$((count-1))
       [[ "$count" -le 0 ]] && break

@@ -40,6 +40,15 @@ whatdidi rm 2
 > sudo rm bar.txt
 ```
 
+#### Return only unique results with `-u` / `--unique`:
+```
+whatdidi -u git 5
+> git push origin main
+> git commit -m "wip"
+> git status
+```
+The flag can go anywhere, e.g. `whatdidi git 5 -u`. With `-u`, the count is the number of *unique* commands to show; byte-identical commands are collapsed (so `rm foo` and `sudo rm foo` remain distinct).
+
 #### Set the default number of results:
 ```
 whatdidi --set-default 3

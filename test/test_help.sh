@@ -12,7 +12,7 @@ test_help_exits_zero() {
 test_help_prints_usage() {
     run_ni --help
     assert_contains "$NI_STDOUT" "Usage:" "has Usage section" &&
-    assert_contains "$NI_STDOUT" "whatdidi <command> [count]" "shows syntax"
+    assert_contains "$NI_STDOUT" "whatdidi [-u] <command> [count]" "shows syntax"
 }
 
 test_help_shows_examples() {

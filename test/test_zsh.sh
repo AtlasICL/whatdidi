@@ -197,7 +197,7 @@ test_zsh_help() {
     run_ni_zsh --help
     assert_eq 0 "$NI_EXIT" "exit code" &&
     assert_contains "$NI_STDOUT" "Usage:" "has Usage section" &&
-    assert_contains "$NI_STDOUT" "whatdidi <command> [count]" "shows syntax"
+    assert_contains "$NI_STDOUT" "whatdidi [-u] <command> [count]" "shows syntax"
 }
 
 test_zsh_no_args_returns_2() {
