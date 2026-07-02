@@ -131,7 +131,15 @@ export HISTFILE="$histfile"
 HISTSIZE=10000
 HISTFILESIZE=10000
 history -c
-history -r "\$HISTFILE"
+# Seed with 'history -n' (not '-r'): on bash 3.2 '-r' doesn't advance the '-n'
+# read cursor, so whatdidi's internal 'history -n' would re-read the seeded file
+# and double every entry. '-n' seeding advances the cursor, matching bash 5.
+# Precondition: this relies on HISTFILE NOT having been read at interactive
+# startup (in the sandbox it defaults to the nonexistent $TEST_HOME/.bash_history,
+# so the '-n' cursor starts at 0). If a future test pre-exports HISTFILE or
+# creates $TEST_HOME/.bash_history, 'history -c' + 'history -n' would silently
+# seed zero lines instead.
+history -n "\$HISTFILE"
 $hi_preamble
 source "$WHATDIDI_SRC"
 whatdidi $wdi_args
@@ -145,7 +153,7 @@ HEREDOC
 # zsh variants of the runners above. They reuse the same NI_*/HI_* result vars
 # so zsh test functions read identically to the bash ones. zsh is launched with
 # -f (skip rc files, like bash's --norc --noprofile); seeded history is loaded
-# with `fc -R` instead of bash's `history -r`.
+# with `fc -R` instead of bash's `history -n`.
 
 run_ni_zsh() {
     # Usage: run_ni_zsh [whatdidi args...]
