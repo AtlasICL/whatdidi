@@ -183,7 +183,7 @@ test_zsh_version() {
     run_ni_zsh --version
     assert_eq 0 "$NI_EXIT" "exit code" &&
     assert_contains "$NI_STDOUT" "whatdidi" "has program name" &&
-    assert_contains "$NI_STDOUT" "1.2.0" "has version number"
+    assert_contains "$NI_STDOUT" "1.3.0" "has version number"
 }
 
 test_zsh_v_flag_same_as_version() {
