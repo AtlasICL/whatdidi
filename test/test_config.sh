@@ -98,6 +98,18 @@ test_config_unrelated_lines_ignored() {
     assert_not_contains "$HI_STDERR" "invalid default_count" "no warning for well-formed config with extra lines"
 }
 
+test_config_leading_zero_value_honored() {
+    # M1: a config value with a leading zero (default_count=08) must be read as
+    # decimal 8, not rejected as octal by bash arithmetic. Assert on stderr
+    # (no arithmetic error, no invalid warning) rather than an exact match count
+    # so the test is robust to the sandbox's history-doubling artifact.
+    local hist
+    hist="$(printf '%s\n' "curl aaa" "curl bbb")"
+    run_hi "$hist" "curl" "default_count=08"
+    assert_not_contains "$HI_STDERR" "value too great" "08 not parsed as octal" &&
+    assert_not_contains "$HI_STDERR" "invalid default_count" "08 honored, not rejected"
+}
+
 run_config_tests() {
     printf '\033[1mConfig sourcing\033[0m\n'
     run_test test_config_default_count_used
@@ -112,6 +124,7 @@ run_config_tests() {
     run_test test_config_large_valid_value_used
     run_test test_config_last_default_count_line_wins
     run_test test_config_unrelated_lines_ignored
+    run_test test_config_leading_zero_value_honored
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

@@ -13,6 +13,10 @@ whatdidi() {
   fi
   # A corrupt/hand-edited config shouldn't make the tool unusable: fall back to
   # the built-in default and warn rather than erroring out.
+  # Force base-10 once the value is known to be all digits: a stray leading zero
+  # (e.g. 08) is otherwise read as octal by bash arithmetic and errors, while
+  # zsh treats it as decimal — normalizing here keeps both shells in agreement.
+  [[ "$default_count" =~ ^[0-9]+$ ]] && default_count=$((10#$default_count))
   if ! [[ "$default_count" =~ ^[0-9]+$ ]] || [[ "$default_count" -lt 1 ]]; then
     echo "whatdidi: invalid default_count in $_wdi_conf; using 1" >&2
     default_count=1
@@ -61,7 +65,10 @@ HELP
       return 1
     fi
     local reply
-    read -r -p "Update whatdidi to the latest version? [Y/n] " reply
+    # `read -p` is bash-only; in zsh -p reads from the coprocess, so prompt
+    # via printf and read the reply separately to stay portable.
+    printf 'Update whatdidi to the latest version? [Y/n] ' >&2
+    read -r reply
     reply="${reply:-Y}"
     if [[ ! "$reply" =~ ^[Yy]$ ]]; then
       echo "whatdidi: update cancelled"
@@ -74,7 +81,10 @@ HELP
 
   if [[ "$needle" == "--uninstall" ]]; then
     local reply
-    read -r -p "Uninstall whatdidi? This will remove the tool and your config. [Y/n] " reply
+    # `read -p` is bash-only; in zsh -p reads from the coprocess, so prompt
+    # via printf and read the reply separately to stay portable.
+    printf 'Uninstall whatdidi? This will remove the tool and your config. [Y/n] ' >&2
+    read -r reply
     reply="${reply:-Y}"
     if [[ ! "$reply" =~ ^[Yy]$ ]]; then
       echo "whatdidi: uninstall cancelled"
@@ -83,19 +93,44 @@ HELP
     local install_path="/usr/local/bin/whatdidi"
     local source_line="source /usr/local/bin/whatdidi"
     local conf_dir="${HOME}/.config/whatdidi"
+    # Track whether any rc rewrite failed so a partial failure isn't masked by
+    # the success message + `return 0` at the end of the block.
+    local uninstall_failed=0
     if [[ -f "$install_path" ]]; then
       sudo rm -f "$install_path"
       echo "whatdidi: removed $install_path"
     fi
     for rc in "${HOME}/.bashrc" "${HOME}/.zshrc"; do
       if [[ -f "$rc" ]] && grep -qxF "$source_line" "$rc" 2>/dev/null; then
-        grep -vxF "$source_line" "$rc" > "${rc}.wdi_tmp" && mv "${rc}.wdi_tmp" "$rc"
-        echo "whatdidi: removed source line from $rc"
+        # Don't gate on grep's exit status: when the source line is the ONLY
+        # line, grep -v matches nothing and exits 1, which would otherwise skip
+        # the write and orphan the temp file. We want the (possibly empty)
+        # filtered output either way.
+        grep -vxF "$source_line" "$rc" > "${rc}.wdi_tmp"
+        # Copy back with `cat >` rather than `mv` so a symlinked rc file (common
+        # with dotfile managers) is edited in place — mv would replace the
+        # symlink with a regular file and leave the real repo-managed file stale.
+        # Only drop the temp file and claim success if the write actually
+        # completed: if `cat >` fails mid-write (e.g. disk full) the temp copy is
+        # the only intact version, so keep it and report the failure to stderr.
+        if cat "${rc}.wdi_tmp" > "$rc"; then
+          rm -f "${rc}.wdi_tmp"
+          echo "whatdidi: removed source line from $rc"
+        else
+          echo "whatdidi: failed to rewrite $rc; left ${rc}.wdi_tmp in place" >&2
+          uninstall_failed=1
+        fi
       fi
     done
+    # The config dir is independent of the rc files, so clean it up even if an
+    # rc rewrite failed above — but still surface the failure below.
     if [[ -d "$conf_dir" ]]; then
       rm -rf "$conf_dir"
       echo "whatdidi: removed config directory $conf_dir"
+    fi
+    if [[ "$uninstall_failed" -ne 0 ]]; then
+      echo "whatdidi: uninstall completed with errors; see messages above" >&2
+      return 1
     fi
     echo "whatdidi: uninstalled. You may restart your terminal to complete removal."
     return 0
@@ -103,7 +138,14 @@ HELP
 
   if [[ "$needle" == "--set-default" ]]; then
     local new_count="${2:-}"
-    if [[ -z "$new_count" ]] || ! [[ "$new_count" =~ ^[0-9]+$ ]] || [[ "$new_count" -lt 1 ]]; then
+    if [[ -z "$new_count" ]] || ! [[ "$new_count" =~ ^[0-9]+$ ]]; then
+      echo "whatdidi: --set-default requires a nonzero positive int" >&2
+      return 2
+    fi
+    # Force base-10 before the range check and before persisting, so an input
+    # like 08 becomes 8 rather than a config bash later chokes on as octal.
+    new_count=$((10#$new_count))
+    if [[ "$new_count" -lt 1 ]]; then
       echo "whatdidi: --set-default requires a nonzero positive int" >&2
       return 2
     fi
@@ -117,6 +159,9 @@ HELP
     echo "Usage: whatdidi <command> [count]  (try --help)" >&2
     return 2
   fi
+  # Force base-10 before the range check and the later decrement so a leading
+  # zero (e.g. 08) doesn't trip bash's octal arithmetic.
+  [[ "$count" =~ ^[0-9]+$ ]] && count=$((10#$count))
   if ! [[ "$count" =~ ^[0-9]+$ ]] || [[ "$count" -lt 1 ]]; then
     echo "whatdidi: count must be a nonzero positive int" >&2
     echo "For searching for a compound command (e.g. whatdidi \"git clone\") please use double quotes" >&2

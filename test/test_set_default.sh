@@ -68,6 +68,25 @@ test_set_default_count_extra_args_ignored() {
     assert_eq "default_count=5" "$content" "extra arg silently ignored"
 }
 
+test_set_default_leading_zero_persisted_as_decimal() {
+    # M1: --set-default 08 must be normalized to base-10 before it is written,
+    # so the config reads default_count=8 (not 08, which bash would later choke
+    # on as octal).
+    run_ni --set-default 08
+    assert_eq 0 "$NI_EXIT" "exit code" &&
+    local content
+    content="$(cat "$TEST_HOME/.config/whatdidi/config")"
+    assert_eq "default_count=8" "$content" "08 persisted as decimal 8"
+}
+
+test_set_default_double_zero_returns_2() {
+    # 00 normalizes to 0, which is below the minimum of 1, so it must be
+    # rejected just like a plain 0.
+    run_ni --set-default 00
+    assert_eq 2 "$NI_EXIT" "exit code" &&
+    assert_contains "$NI_STDERR" "nonzero positive int" "error message"
+}
+
 run_set_default_tests() {
     printf '\033[1m--set-default\033[0m\n'
     run_test test_set_default_count_exits_zero
@@ -80,6 +99,8 @@ run_set_default_tests() {
     run_test test_set_default_count_non_integer_returns_2
     run_test test_set_default_count_large_value
     run_test test_set_default_count_extra_args_ignored
+    run_test test_set_default_leading_zero_persisted_as_decimal
+    run_test test_set_default_double_zero_returns_2
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

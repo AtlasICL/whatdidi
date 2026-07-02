@@ -261,6 +261,37 @@ run_wdi_stdin() {
     SI_STDERR="$(cat "$stderr_f")"
 }
 
+run_wdi_stdin_zsh() {
+    # zsh counterpart of run_wdi_stdin: exercises the --update/--uninstall
+    # confirmation prompts under zsh, which is where the H1 `read -p` bug hid
+    # (zsh treats `-p` as "read from coprocess", so the bash-only prompt was
+    # silently skipped). Sources whatdidi under zsh -f with HOME=TEST_HOME + a
+    # no-op sudo, feeds $1 to stdin (the confirmation reply) and runs $2.
+    # $3 = (optional) shell preamble injected after sourcing, before the call.
+    # Sets the SAME result vars as the bash version so zsh test bodies read
+    # identically: SI_STDOUT, SI_STDERR, SI_EXIT.
+    local stdin_data="$1" args="$2" preamble="${3:-}"
+    local mockbin stdout_f stderr_f
+    mockbin="$(make_mock_sudo)"
+    stdout_f="$TEST_TMPDIR/si_out"
+    stderr_f="$TEST_TMPDIR/si_err"
+
+    set +e
+    printf '%s\n' "$stdin_data" | \
+        HOME="$TEST_HOME" PATH="$mockbin:$PATH" zsh -f -c '
+            source "'"$WHATDIDI_SRC"'"
+            '"$preamble"'
+            whatdidi '"$args"'
+        ' >"$stdout_f" 2>"$stderr_f"
+    SI_EXIT=$?
+    set -e
+    SI_STDOUT="$(cat "$stdout_f")"
+    # `zsh -f -c` is non-interactive, so the "cannot set terminal" job-control
+    # noise `run_hi_zsh` filters does not appear here — keep stderr raw like the
+    # bash run_wdi_stdin so error-message assertions match verbatim.
+    SI_STDERR="$(cat "$stderr_f")"
+}
+
 # Count exact (whole-line) occurrences of a string in a file (0 if absent).
 # grep -c prints the count on stdout but exits 1 when the count is 0, so we
 # capture stdout and ignore the exit status.
