@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Category: install script — rc-file wiring
 #
-# Exercises the install script against a sandboxed HOME with a no-op sudo shim,
-# so the rc-file logic runs for real while the privileged /usr/local/bin copy is
-# skipped. Pins: only append to rc files that already exist, never create a
+# Exercises the install script against a sandboxed HOME. Install now copies to a
+# user-owned XDG data path under $HOME and uses no sudo, so both the copy and the
+# rc-file logic run for real in the sandbox. Pins: only append to rc files that
+# already exist, never create a
 # ~/.zshrc for a non-zsh user, fall back to creating ~/.bashrc if neither
 # exists, and stay idempotent.
 

@@ -1,5 +1,5 @@
-# Install: 1) add this file to /usr/local/bin/whatdidi
-#          2) add `source /usr/local/bin/whatdidi` to ~/.bashrc and/or ~/.zshrc
+# Install: 1) add this file to $HOME/.local/share/whatdidi/whatdidi
+#          2) add `source $HOME/.local/share/whatdidi/whatdidi` to ~/.bashrc and/or ~/.zshrc
 
 
 whatdidi() {
@@ -151,14 +151,14 @@ HELP
       echo "whatdidi: uninstall cancelled"
       return 0
     fi
-    local install_path="/usr/local/bin/whatdidi"
-    local source_line="source /usr/local/bin/whatdidi"
+    local install_path="${HOME}/.local/share/whatdidi/whatdidi"
+    local source_line="source ${HOME}/.local/share/whatdidi/whatdidi"
     local conf_dir="${HOME}/.config/whatdidi"
     # Track whether any rc rewrite failed so a partial failure isn't masked by
     # the success message + `return 0` at the end of the block.
     local uninstall_failed=0
     if [[ -f "$install_path" ]]; then
-      sudo rm -f "$install_path"
+      rm -f "$install_path"
       echo "whatdidi: removed $install_path"
     fi
     for rc in "${HOME}/.bashrc" "${HOME}/.zshrc"; do

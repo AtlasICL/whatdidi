@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Category: --update / --uninstall confirmation + cleanup
 #
-# These drive the confirmation prompts via stdin and use a no-op sudo shim + a
-# sandboxed HOME. The "proceed" path of --update is deliberately NOT exercised
+# These drive the confirmation prompts via stdin under a sandboxed HOME. The
+# tool installs/uninstalls under a user-owned $HOME path with no sudo. The
+# "proceed" path of --update is deliberately NOT exercised
 # (it would run `curl | sh` against the network); only its guard rails are.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

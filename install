@@ -36,8 +36,10 @@ print_error() { printf "\n${RED}[ERROR] %s${RESET}\n" "$*"; }
 # ------------------------------------------------------------------------------
 
 REPO_RAW="https://raw.githubusercontent.com/AtlasICL/whatdidi/main"
-INSTALL_PATH="/usr/local/bin/whatdidi"
-SOURCE_LINE="source /usr/local/bin/whatdidi"
+# Install under the user-owned XDG data dir so no root/sudo is ever needed.
+# $HOME is expanded here so the absolute path is what gets written into rc files.
+INSTALL_PATH="$HOME/.local/share/whatdidi/whatdidi"
+SOURCE_LINE="source $HOME/.local/share/whatdidi/whatdidi"
 
 # Prefer a whatdidi file sitting next to this script (clone/dev installs);
 # otherwise download it from the repo. This lets the same script run both from a
@@ -47,15 +49,13 @@ case "$0" in
     */*) script_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd)" ;;
 esac
 
-if ! sudo -v 2>/dev/null; then
-  print_error "Installation requires sudo privileges."
-  exit 1
-fi
-
 print_info "Installing whatdidi to $INSTALL_PATH ..."
+# Ensure the target directory exists before copying (no sudo needed — it's
+# under the user's own $HOME).
+mkdir -p "$(dirname "$INSTALL_PATH")"
 if [ -n "$script_dir" ] && [ -f "$script_dir/whatdidi" ]; then
     print_info "Using local copy: $script_dir/whatdidi"
-    sudo cp "$script_dir/whatdidi" "$INSTALL_PATH"
+    cp "$script_dir/whatdidi" "$INSTALL_PATH"
 else
     if ! command -v curl >/dev/null 2>&1; then
         print_error "curl is required to download whatdidi but was not found."
@@ -68,9 +68,9 @@ else
         print_error "Failed to download whatdidi from $REPO_RAW/whatdidi"
         exit 1
     fi
-    sudo cp "$tmp" "$INSTALL_PATH"
+    cp "$tmp" "$INSTALL_PATH"
 fi
-sudo chmod 644 "$INSTALL_PATH"
+chmod 644 "$INSTALL_PATH"
 
 # Add the source line to a shell rc file only if not already present - idempotent.
 # Appending creates the file if it does not exist yet.

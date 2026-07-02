@@ -9,8 +9,12 @@ set -euo pipefail
 # Constants
 WHATDIDI_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/whatdidi"
 INSTALL_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/install"
-# The exact line install adds to rc files and uninstall removes.
-SOURCE_LINE="source /usr/local/bin/whatdidi"
+# The exact line install adds to rc files and uninstall removes. It is a
+# $HOME-derived absolute path, and both install and whatdidi expand $HOME at
+# runtime — so under the sandbox (HOME=$TEST_HOME) it must expand to $TEST_HOME.
+# Because TEST_HOME is freshly minted per test in setup(), SOURCE_LINE is
+# (re)computed there rather than pinned to a static string here.
+SOURCE_LINE=""
 PASS=0
 FAIL=0
 ERRORS=()
@@ -21,6 +25,9 @@ setup() {
     TEST_TMPDIR="$(mktemp -d)"
     TEST_HOME="$TEST_TMPDIR/home"
     mkdir -p "$TEST_HOME"
+    # Recompute against this test's TEST_HOME so it matches the expanded path the
+    # install script / whatdidi write when run with HOME=$TEST_HOME.
+    SOURCE_LINE="source $TEST_HOME/.local/share/whatdidi/whatdidi"
 }
 
 teardown() {
@@ -210,34 +217,20 @@ HEREDOC
 
 # Tier 3: install / lifecycle runners
 #
-# These exercise the install script and the --update / --uninstall paths
-# without root. A no-op `sudo` shim is placed on PATH so the privileged
-# /usr/local/bin copy/remove is skipped while the rc-file wiring (which touches
-# the sandboxed TEST_HOME) runs for real.
-
-make_mock_sudo() {
-    # Create a no-op `sudo` in a temp bin dir and echo the dir path.
-    local dir="$TEST_TMPDIR/mockbin"
-    mkdir -p "$dir"
-    cat > "$dir/sudo" <<'EOF'
-#!/bin/sh
-# no-op sudo for tests: succeed without doing anything privileged
-exit 0
-EOF
-    chmod +x "$dir/sudo"
-    printf '%s' "$dir"
-}
+# These exercise the install script and the --update / --uninstall paths. Both
+# now install to a user-owned XDG data path under $HOME (=$TEST_HOME in the
+# sandbox) and use no sudo at all, so the copy/remove and rc-file wiring all run
+# for real inside the sandbox without any privilege shim.
 
 run_install() {
-    # Run the install script with HOME=TEST_HOME and a no-op sudo.
+    # Run the install script with HOME=TEST_HOME.
     # Sets: INST_STDOUT, INST_STDERR, INST_EXIT
-    local mockbin stdout_f stderr_f
-    mockbin="$(make_mock_sudo)"
+    local stdout_f stderr_f
     stdout_f="$TEST_TMPDIR/inst_out"
     stderr_f="$TEST_TMPDIR/inst_err"
 
     set +e
-    HOME="$TEST_HOME" PATH="$mockbin:$PATH" sh "$INSTALL_SRC" >"$stdout_f" 2>"$stderr_f"
+    HOME="$TEST_HOME" sh "$INSTALL_SRC" >"$stdout_f" 2>"$stderr_f"
     INST_EXIT=$?
     set -e
     INST_STDOUT="$(cat "$stdout_f")"
@@ -245,20 +238,19 @@ run_install() {
 }
 
 run_wdi_stdin() {
-    # Source whatdidi under bash with HOME=TEST_HOME + a no-op sudo, feed $1 to
-    # stdin (for the --update/--uninstall confirmation prompt) and run $2.
+    # Source whatdidi under bash with HOME=TEST_HOME, feed $1 to stdin (for the
+    # --update/--uninstall confirmation prompt) and run $2.
     # $3 = (optional) shell preamble injected after sourcing, before the call
     #      (e.g. to shadow `command -v curl` and simulate curl being absent).
     # Sets: SI_STDOUT, SI_STDERR, SI_EXIT
     local stdin_data="$1" args="$2" preamble="${3:-}"
-    local mockbin stdout_f stderr_f
-    mockbin="$(make_mock_sudo)"
+    local stdout_f stderr_f
     stdout_f="$TEST_TMPDIR/si_out"
     stderr_f="$TEST_TMPDIR/si_err"
 
     set +e
     printf '%s\n' "$stdin_data" | \
-        HOME="$TEST_HOME" PATH="$mockbin:$PATH" bash --norc --noprofile -c '
+        HOME="$TEST_HOME" bash --norc --noprofile -c '
             source "'"$WHATDIDI_SRC"'"
             '"$preamble"'
             whatdidi '"$args"'
@@ -276,14 +268,13 @@ run_wdi_stdin_emptyhome() {
     # must never be removed. Same result vars as run_wdi_stdin: SI_STDOUT,
     # SI_STDERR, SI_EXIT.
     local stdin_data="$1" args="$2" preamble="${3:-}"
-    local mockbin stdout_f stderr_f
-    mockbin="$(make_mock_sudo)"
+    local stdout_f stderr_f
     stdout_f="$TEST_TMPDIR/si_out"
     stderr_f="$TEST_TMPDIR/si_err"
 
     set +e
     printf '%s\n' "$stdin_data" | \
-        HOME="" PATH="$mockbin:$PATH" bash --norc --noprofile -c '
+        HOME="" bash --norc --noprofile -c '
             source "'"$WHATDIDI_SRC"'"
             '"$preamble"'
             whatdidi '"$args"'
@@ -298,20 +289,19 @@ run_wdi_stdin_zsh() {
     # zsh counterpart of run_wdi_stdin: exercises the --update/--uninstall
     # confirmation prompts under zsh, which is where the H1 `read -p` bug hid
     # (zsh treats `-p` as "read from coprocess", so the bash-only prompt was
-    # silently skipped). Sources whatdidi under zsh -f with HOME=TEST_HOME + a
-    # no-op sudo, feeds $1 to stdin (the confirmation reply) and runs $2.
+    # silently skipped). Sources whatdidi under zsh -f with HOME=TEST_HOME,
+    # feeds $1 to stdin (the confirmation reply) and runs $2.
     # $3 = (optional) shell preamble injected after sourcing, before the call.
     # Sets the SAME result vars as the bash version so zsh test bodies read
     # identically: SI_STDOUT, SI_STDERR, SI_EXIT.
     local stdin_data="$1" args="$2" preamble="${3:-}"
-    local mockbin stdout_f stderr_f
-    mockbin="$(make_mock_sudo)"
+    local stdout_f stderr_f
     stdout_f="$TEST_TMPDIR/si_out"
     stderr_f="$TEST_TMPDIR/si_err"
 
     set +e
     printf '%s\n' "$stdin_data" | \
-        HOME="$TEST_HOME" PATH="$mockbin:$PATH" zsh -f -c '
+        HOME="$TEST_HOME" zsh -f -c '
             source "'"$WHATDIDI_SRC"'"
             '"$preamble"'
             whatdidi '"$args"'
