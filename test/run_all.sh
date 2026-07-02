@@ -9,6 +9,7 @@ source "$SCRIPT_DIR/test_help.sh"
 source "$SCRIPT_DIR/test_version.sh"
 source "$SCRIPT_DIR/test_args.sh"
 source "$SCRIPT_DIR/test_set_default.sh"
+source "$SCRIPT_DIR/test_set_default_unique.sh"
 source "$SCRIPT_DIR/test_config.sh"
 source "$SCRIPT_DIR/test_search.sh"
 source "$SCRIPT_DIR/test_unique.sh"
@@ -33,6 +34,8 @@ printf '\n'
 run_args_tests
 printf '\n'
 run_set_default_tests
+printf '\n'
+run_set_default_unique_tests
 printf '\n'
 run_config_tests
 printf '\n'

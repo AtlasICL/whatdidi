@@ -110,6 +110,81 @@ test_config_leading_zero_value_honored() {
     assert_not_contains "$HI_STDERR" "invalid default_count" "08 honored, not rejected"
 }
 
+test_config_default_unique_true_dedups() {
+    # A plain search (no -u) must dedup when default_unique=true. Seed byte-
+    # identical matches: they collapse to exactly 1 under dedup regardless of the
+    # sandbox history-doubling artifact, so the count is deterministic.
+    local hist
+    hist="$(printf '%s\n' "curl aaa" "curl aaa" "echo hello" "curl aaa")"
+    run_hi "$hist" "curl 10" "default_unique=true"
+    assert_line_count 1 "$HI_STDOUT" "default_unique=true dedups without -u" &&
+    assert_not_contains "$HI_STDERR" "invalid default_unique" "valid value produces no warning"
+}
+
+test_config_default_unique_false_no_dedup() {
+    # default_unique=false leaves the default behavior untouched: duplicates are
+    # all returned. Mirrors test_no_flag_path_unchanged (asserts exactly 3).
+    local hist
+    hist="$(printf '%s\n' "curl aaa" "curl aaa" "curl aaa")"
+    run_hi "$hist" "curl 10" "default_unique=false"
+    assert_line_count 3 "$HI_STDOUT" "default_unique=false returns all duplicates" &&
+    assert_not_contains "$HI_STDERR" "invalid default_unique" "valid value produces no warning"
+}
+
+test_config_default_unique_absent_no_dedup() {
+    # Absence of default_unique is normal (not corrupt): silently false, no
+    # warning, duplicates all returned.
+    local hist
+    hist="$(printf '%s\n' "curl aaa" "curl aaa" "curl aaa")"
+    run_hi "$hist" "curl 10" "default_count=10"
+    assert_line_count 3 "$HI_STDOUT" "absent default_unique behaves as false" &&
+    assert_not_contains "$HI_STDERR" "invalid default_unique" "absent key produces no warning"
+}
+
+test_config_default_unique_empty_warns() {
+    # A present-but-EMPTY line (default_unique=) is garbage, not absence, so it
+    # warns and falls back to false — the _wdi_unique_seen sentinel is what lets
+    # the loader tell "present but empty" apart from "absent".
+    local hist
+    hist="$(printf '%s\n' "curl aaa" "curl aaa" "curl aaa")"
+    run_hi "$hist" "curl 10" "default_unique="
+    assert_contains "$HI_STDERR" "invalid default_unique" "empty value warned" &&
+    assert_line_count 3 "$HI_STDOUT" "empty value falls back to false (no dedup)"
+}
+
+test_config_default_unique_bogus_warns() {
+    local hist
+    hist="$(printf '%s\n' "curl aaa" "curl aaa" "curl aaa")"
+    run_hi "$hist" "curl 10" "default_unique=bogus"
+    assert_contains "$HI_STDERR" "invalid default_unique" "bogus value warned" &&
+    assert_line_count 3 "$HI_STDOUT" "bogus value falls back to false (no dedup)"
+}
+
+test_config_default_unique_capitalized_warns() {
+    # Only lowercase true/false are valid; True is invalid and must warn + fall
+    # back to false.
+    local hist
+    hist="$(printf '%s\n' "curl aaa" "curl aaa" "curl aaa")"
+    run_hi "$hist" "curl 10" "default_unique=True"
+    assert_contains "$HI_STDERR" "invalid default_unique" "capitalized True warned" &&
+    assert_line_count 3 "$HI_STDOUT" "True falls back to false (no dedup)"
+}
+
+test_config_both_keys_coexist() {
+    # Both keys together take effect at once. With default_count=3 AND
+    # default_unique=true, a search with NO explicit count reads the count (3)
+    # from config and dedups. The history has only 2 DISTINCT matches (with dups
+    # interleaved), so the deduped result is 2 — a count that could ONLY happen if
+    # BOTH keys were honored: default 1 would give 1, and no-dedup would give 3.
+    # Byte-identical dups make this robust to history-doubling.
+    local hist config
+    hist="$(printf '%s\n' "curl aaa" "curl bbb" "curl aaa" "curl bbb" "curl aaa")"
+    config="$(printf '%s\n' "default_count=3" "default_unique=true")"
+    run_hi "$hist" "curl" "$config"
+    assert_line_count 2 "$HI_STDOUT" "count=3 + unique=true yields the 2 distinct matches" &&
+    assert_not_contains "$HI_STDERR" "invalid default_unique" "valid config produces no warning"
+}
+
 run_config_tests() {
     printf '\033[1mConfig sourcing\033[0m\n'
     run_test test_config_default_count_used
@@ -125,6 +200,13 @@ run_config_tests() {
     run_test test_config_last_default_count_line_wins
     run_test test_config_unrelated_lines_ignored
     run_test test_config_leading_zero_value_honored
+    run_test test_config_default_unique_true_dedups
+    run_test test_config_default_unique_false_no_dedup
+    run_test test_config_default_unique_absent_no_dedup
+    run_test test_config_default_unique_empty_warns
+    run_test test_config_default_unique_bogus_warns
+    run_test test_config_default_unique_capitalized_warns
+    run_test test_config_both_keys_coexist
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

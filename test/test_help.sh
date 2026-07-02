@@ -27,7 +27,17 @@ test_help_mentions_sudo() {
 
 test_help_mentions_set_default_count() {
     run_ni --help
-    assert_contains "$NI_STDOUT" "--set-default" "documents --set-default"
+    assert_contains "$NI_STDOUT" "--set-default-count" "documents --set-default-count"
+}
+
+test_help_mentions_set_default_unique() {
+    run_ni --help
+    assert_contains "$NI_STDOUT" "--set-default-unique" "documents --set-default-unique"
+}
+
+test_help_mentions_no_unique() {
+    run_ni --help
+    assert_contains "$NI_STDOUT" "--no-unique" "documents --no-unique"
 }
 
 test_h_flag_exits_zero() {
@@ -61,6 +71,8 @@ run_help_tests() {
     run_test test_help_shows_examples
     run_test test_help_mentions_sudo
     run_test test_help_mentions_set_default_count
+    run_test test_help_mentions_set_default_unique
+    run_test test_help_mentions_no_unique
     run_test test_h_flag_exits_zero
     run_test test_h_flag_same_as_help
     run_test test_help_with_trailing_args_ignored

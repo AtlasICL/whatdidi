@@ -3,13 +3,20 @@
 
 
 whatdidi() {
-  local needle count line default_count _wdi_conf _wdi_line stripped desudo
-  local unique seen sep _wdi_arg _wdi_i _wdi_n
+  local needle count line default_count default_unique _wdi_conf _wdi_line stripped desudo
+  local unique seen sep _wdi_arg _wdi_i _wdi_n _wdi_unique_seen
   _wdi_conf="${HOME}/.config/whatdidi/config"
   default_count=1
+  # Track whether a default_unique= line was seen with a boolean, kept separate
+  # from its value: an empty-string value alone can't tell apart "key absent"
+  # (normal, no warning) from "key present but empty" (garbage, warn), so we can't
+  # use the value itself as the sentinel the way an empty string would suggest.
+  default_unique=""
+  _wdi_unique_seen=0
   if [[ -f "$_wdi_conf" ]]; then
     while IFS= read -r _wdi_line || [[ -n "$_wdi_line" ]]; do
       [[ "$_wdi_line" == default_count=* ]] && default_count="${_wdi_line#default_count=}"
+      [[ "$_wdi_line" == default_unique=* ]] && { default_unique="${_wdi_line#default_unique=}"; _wdi_unique_seen=1; }
     done < "$_wdi_conf"
   fi
   # A corrupt/hand-edited config shouldn't make the tool unusable: fall back to
@@ -22,15 +29,39 @@ whatdidi() {
     echo "whatdidi: invalid default_count in $_wdi_conf; using 1" >&2
     default_count=1
   fi
-  # Parse an optional -u/--unique flag out of the argument list before reading
-  # positional args, so it can appear anywhere: `whatdidi -u curl 3`,
+  # Mirror the default_count handling for default_unique. Absence is normal (the
+  # key simply wasn't set) so it silently becomes "false"; a present-but-invalid
+  # value is a corrupt config, so warn and fall back to "false" — exactly like
+  # the invalid default_count case above. A present-but-EMPTY line (default_unique=)
+  # counts as present-but-invalid and warns too, since _wdi_unique_seen distinguishes
+  # it from true absence. Only the literal lowercase spellings "true"/"false" are
+  # accepted, matching what the --set-default-unique setter writes and keeping
+  # bash 3.2 and zsh in agreement.
+  if [[ "$_wdi_unique_seen" -eq 0 ]]; then
+    default_unique="false"
+  elif [[ "$default_unique" != "true" && "$default_unique" != "false" ]]; then
+    echo "whatdidi: invalid default_unique in $_wdi_conf; using false" >&2
+    default_unique="false"
+  fi
+  # Seed the runtime unique flag from the persisted default before parsing args,
+  # so the config value takes effect when no flag is given and the flags below can
+  # still override it either way.
+  if [[ "$default_unique" == "true" ]]; then
+    unique=1
+  else
+    unique=0
+  fi
+  # Parse optional -u/--unique / --no-unique flags out of the argument list before
+  # reading positional args, so they can appear anywhere: `whatdidi -u curl 3`,
   # `whatdidi curl 3 -u`, and `whatdidi curl -u 2` are all equivalent. Rotate the
-  # positional params — shift each arg off the front and, unless it's the flag,
+  # positional params — shift each arg off the front and, unless it's a flag,
   # re-append it to the end — so after $# passes the non-flag args are back in
-  # their original order with the flag removed. This is a fully portable rebuild
+  # their original order with the flags removed. This is a fully portable rebuild
   # (no arrays, which bash 3.2 lacks and zsh spells differently) that preserves
   # arg boundaries, so multi-word needles like "git push" survive intact.
-  unique=0
+  # --no-unique forces dedup off (e.g. to override a `true` default); because each
+  # case sets `unique` as the flag is encountered and we process args in order,
+  # when both -u and --no-unique are given the LAST one on the line wins.
   _wdi_n=$#
   _wdi_i=0
   while [[ "$_wdi_i" -lt "$_wdi_n" ]]; do
@@ -38,6 +69,7 @@ whatdidi() {
     shift
     case "$_wdi_arg" in
       -u|--unique) unique=1 ;;
+      --no-unique) unique=0 ;;
       *) set -- "$@" "$_wdi_arg" ;;
     esac
     _wdi_i=$((_wdi_i+1))
@@ -63,20 +95,25 @@ Arguments:
   count     Number of recent matches to show (default: 1).
 
 Options:
-  --set-default <n>   Set the default number of results to show
-                      when count is not specified. Persists across
-                      sessions (~/.config/whatdidi/config).
-  --update            Reinstall whatdidi with the latest version.
-  --uninstall         Uninstall whatdidi from your system.
-  -u, --unique        Only return unique (deduplicated) results.
-  -v, --version       Show version and author information.
-  -h, --help          Show this help message.
+  --set-default-count <n>         Set the default number of results to show
+                                  when count is not specified. Persists across
+                                  sessions (~/.config/whatdidi/config).
+  --set-default-unique <true|false>
+                                  Set whether results are deduplicated by
+                                  default. Persists across sessions.
+  --update                        Reinstall whatdidi with the latest version.
+  --uninstall                     Uninstall whatdidi from your system.
+  -u, --unique                    Only return unique (deduplicated) results.
+  --no-unique                     Override a 'true' default and return all results.
+  -v, --version                   Show version and author information.
+  -h, --help                      Show this help message.
 
 Examples:
   whatdidi curl                # last curl command you ran
   whatdidi mvn 3               # last 3 mvn commands
   whatdidi "git switch" 2      # last 2 git switch commands
   whatdidi -u git 5            # last 5 distinct git commands
+  whatdidi --no-unique git 5   # last 5 git commands even if unique is the default
 
 Commands prefixed with sudo are also matched.
 HELP
@@ -162,30 +199,31 @@ HELP
     return 0
   fi
 
-  if [[ "$needle" == "--set-default" ]]; then
+  if [[ "$needle" == "--set-default-count" ]]; then
     local new_count="${2:-}"
     if [[ -z "$new_count" ]] || ! [[ "$new_count" =~ ^[0-9]+$ ]]; then
-      echo "whatdidi: --set-default requires a nonzero positive int" >&2
+      echo "whatdidi: --set-default-count requires a nonzero positive int" >&2
       return 2
     fi
     # Force base-10 before the range check and before persisting, so an input
     # like 08 becomes 8 rather than a config bash later chokes on as octal.
     new_count=$((10#$new_count))
     if [[ "$new_count" -lt 1 ]]; then
-      echo "whatdidi: --set-default requires a nonzero positive int" >&2
+      echo "whatdidi: --set-default-count requires a nonzero positive int" >&2
       return 2
     fi
     mkdir -p "${HOME}/.config/whatdidi"
     # Preserve any unrelated config keys: read the existing file, drop every
-    # existing default_count= line, keep everything else verbatim, then append
-    # the new default_count line. A plain `> "$_wdi_conf"` would truncate the
-    # whole file and silently discard other keys. Build the new content in a temp
-    # file, then copy it back with `cat >` rather than `mv` so a symlinked config
-    # (common with dotfile managers) is edited in place — `mv` would replace the
-    # symlink with a regular file and leave the real repo-managed target stale.
-    # This mirrors the write-through the uninstall rc-rewrite deliberately uses.
-    # The read loop mirrors the portable `read` pattern used to load the config
-    # near the top of this function (works identically in bash 3.2 and zsh).
+    # existing default_count= line, keep everything else verbatim (including any
+    # default_unique= line the unique setter wrote), then append the new
+    # default_count line. A plain `> "$_wdi_conf"` would truncate the whole file
+    # and silently discard other keys. Build the new content in a temp file, then
+    # copy it back with `cat >` rather than `mv` so a symlinked config (common
+    # with dotfile managers) is edited in place — `mv` would replace the symlink
+    # with a regular file and leave the real repo-managed target stale. This
+    # mirrors the write-through the uninstall rc-rewrite deliberately uses. The
+    # read loop mirrors the portable `read` pattern used to load the config near
+    # the top of this function (works identically in bash 3.2 and zsh).
     local _wdi_tmp="${HOME}/.config/whatdidi/config.wdi_tmp.$$"
     : > "$_wdi_tmp"
     if [[ -f "$_wdi_conf" ]]; then
@@ -205,6 +243,46 @@ HELP
       return 1
     fi
     echo "whatdidi: default count set to $new_count"
+    return 0
+  fi
+
+  if [[ "$needle" == "--set-default-unique" ]]; then
+    local new_unique="${2:-}"
+    # Only the literal lowercase spellings "true"/"false" are valid — the same
+    # spellings the config stores and the loader reads — so the persisted value
+    # round-trips cleanly. Anything else (or a missing value) is a user error.
+    if [[ "$new_unique" != "true" && "$new_unique" != "false" ]]; then
+      echo "whatdidi: --set-default-unique requires 'true' or 'false'" >&2
+      return 2
+    fi
+    mkdir -p "${HOME}/.config/whatdidi"
+    # Symmetric to the count setter above: preserve any unrelated config keys by
+    # reading the existing file, dropping ONLY existing default_unique= lines, and
+    # keeping everything else verbatim (crucially the default_count= line, so the
+    # two setters never clobber each other's key), then append the new
+    # default_unique line. Copy back with `cat >` rather than `mv` so a symlinked
+    # config is edited in place, and keep the temp file + report failure if the
+    # write-through doesn't complete. The read loop is the same portable pattern
+    # used everywhere else in this function (bash 3.2 and zsh agree).
+    local _wdi_tmp="${HOME}/.config/whatdidi/config.wdi_tmp.$$"
+    : > "$_wdi_tmp"
+    if [[ -f "$_wdi_conf" ]]; then
+      while IFS= read -r _wdi_line || [[ -n "$_wdi_line" ]]; do
+        [[ "$_wdi_line" == default_unique=* ]] && continue
+        printf '%s\n' "$_wdi_line" >> "$_wdi_tmp"
+      done < "$_wdi_conf"
+    fi
+    printf 'default_unique=%s\n' "$new_unique" >> "$_wdi_tmp"
+    # Only drop the temp file and claim success if the write-through actually
+    # completed: if `cat >` fails mid-write (e.g. disk full) the temp copy is the
+    # only intact version, so keep it and report the failure to stderr.
+    if cat "$_wdi_tmp" > "$_wdi_conf"; then
+      rm -f "$_wdi_tmp"
+    else
+      echo "whatdidi: failed to write $_wdi_conf" >&2
+      return 1
+    fi
+    echo "whatdidi: default unique set to $new_unique"
     return 0
   fi
 

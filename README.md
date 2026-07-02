@@ -47,13 +47,19 @@ whatdidi -u git 5
 > git commit -m "wip"
 > git status
 ```
-The flag can go anywhere, e.g. `whatdidi git 5 -u`. With `-u`, the count is the number of *unique* commands to show; byte-identical commands are collapsed (so `rm foo` and `sudo rm foo` remain distinct).
+The flag can go anywhere, e.g. `whatdidi git 5 -u`. With `-u`, the count is the number of *unique* commands to show; byte-identical commands are collapsed (so `rm foo` and `sudo rm foo` remain distinct). When unique is the default (via `--set-default-unique true`), pass `--no-unique` to return all results for a single search.
 
 #### Set the default number of results:
 ```
-whatdidi --set-default 3
+whatdidi --set-default-count 3
 ```
 This preference is stored in `~/.config/whatdidi/config`
+
+#### Set whether results are unique by default:
+```
+whatdidi --set-default-unique true
+```
+When set to `true`, every search deduplicates results as if `-u` were always passed. Stored in the same `~/.config/whatdidi/config`. Use `false` to turn it back off.
 
 #### Update to the latest version:
 ```

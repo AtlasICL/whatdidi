@@ -105,6 +105,57 @@ test_unique_exit_code_on_match() {
     assert_eq 0 "$HI_EXIT" "exit code 0 on match with -u"
 }
 
+# --- --no-unique (override a unique default) -------------------------------
+
+test_no_unique_overrides_default_true() {
+    # With default_unique=true in config, --no-unique forces dedup OFF. Prove the
+    # override by comparing against the SAME search without --no-unique, which
+    # dedups: identical dups collapse to 1 by default but all 3 return with the
+    # override. The deduped count (1) is robust to history-doubling; the
+    # all-duplicates count (3) relies on the no-doubling seeding invariant,
+    # matching test_no_flag_path_unchanged.
+    local hist all deduped
+    hist="$(printf '%s\n' "curl aaa" "curl aaa" "curl aaa")"
+    run_hi "$hist" "--no-unique curl 10" "default_unique=true"; all="$HI_STDOUT"
+    run_hi "$hist" "curl 10" "default_unique=true"; deduped="$HI_STDOUT"
+    assert_line_count 3 "$all" "--no-unique returns all duplicates" &&
+    assert_line_count 1 "$deduped" "default_unique=true dedups without the override"
+}
+
+test_no_unique_trailing_position() {
+    # --no-unique is parseable from ANY position (same rotation as -u): a trailing
+    # occurrence overrides the true default just like a leading one.
+    local hist
+    hist="$(printf '%s\n' "curl aaa" "curl aaa" "curl aaa")"
+    run_hi "$hist" "curl 10 --no-unique" "default_unique=true"
+    assert_line_count 3 "$HI_STDOUT" "trailing --no-unique overrides unique default"
+}
+
+test_no_unique_noop_when_default_false() {
+    # When the default is already non-unique (no config), --no-unique is a no-op:
+    # it must behave identically to passing no flag at all.
+    local hist with without
+    hist="$(printf '%s\n' "curl aaa" "curl aaa" "curl aaa")"
+    run_hi "$hist" "--no-unique curl 10"; with="$HI_STDOUT"
+    run_hi "$hist" "curl 10"; without="$HI_STDOUT"
+    assert_eq "$without" "$with" "--no-unique is a no-op when default is false" &&
+    assert_line_count 3 "$with" "all duplicates returned"
+}
+
+test_no_unique_last_flag_wins() {
+    # -u and --no-unique are processed in order, so the LAST one on the line wins.
+    # '-u ... --no-unique' ends non-unique (all dups); '--no-unique ... -u' ends
+    # unique (collapsed to 1). The deduped count (1) is robust to history-doubling;
+    # the all-duplicates count (3) relies on the no-doubling seeding invariant,
+    # matching test_no_flag_path_unchanged.
+    local hist no_wins u_wins
+    hist="$(printf '%s\n' "curl aaa" "curl aaa" "curl aaa")"
+    run_hi "$hist" "-u curl 10 --no-unique"; no_wins="$HI_STDOUT"
+    run_hi "$hist" "--no-unique curl 10 -u"; u_wins="$HI_STDOUT"
+    assert_line_count 3 "$no_wins" "trailing --no-unique wins over leading -u" &&
+    assert_line_count 1 "$u_wins" "trailing -u wins over leading --no-unique"
+}
+
 # --- zsh parity ------------------------------------------------------------
 # Replicate the two core behaviors under zsh so bash and zsh stay in lockstep.
 
@@ -124,6 +175,17 @@ test_distinct_matches_preserved_zsh() {
     assert_eq "curl bbb" "$(printf '%s\n' "$HI_STDOUT" | tail -1)" "older distinct last under zsh"
 }
 
+test_no_unique_overrides_default_true_zsh() {
+    # zsh parity for the core override: default_unique=true + --no-unique returns
+    # all duplicates, while the same search without the override dedups to 1.
+    local hist all deduped
+    hist="$(printf '%s\n' "curl aaa" "curl aaa" "curl aaa")"
+    run_hi_zsh "$hist" "--no-unique curl 10" "default_unique=true"; all="$HI_STDOUT"
+    run_hi_zsh "$hist" "curl 10" "default_unique=true"; deduped="$HI_STDOUT"
+    assert_line_count 3 "$all" "--no-unique returns all duplicates under zsh" &&
+    assert_line_count 1 "$deduped" "default_unique=true dedups without the override under zsh"
+}
+
 run_unique_tests() {
     printf '\033[1mUnique flag\033[0m\n'
     run_test test_dedup_collapses_identical
@@ -135,12 +197,18 @@ run_unique_tests() {
     run_test test_no_flag_path_unchanged
     run_test test_multiword_needle_with_unique
     run_test test_unique_exit_code_on_match
+    run_test test_no_unique_overrides_default_true
+    run_test test_no_unique_trailing_position
+    run_test test_no_unique_noop_when_default_false
+    run_test test_no_unique_last_flag_wins
     if command -v zsh >/dev/null 2>&1; then
         run_test test_dedup_collapses_identical_zsh
         run_test test_distinct_matches_preserved_zsh
+        run_test test_no_unique_overrides_default_true_zsh
     else
         printf '  \033[33mSKIP\033[0m  test_dedup_collapses_identical_zsh (zsh not installed)\n'
         printf '  \033[33mSKIP\033[0m  test_distinct_matches_preserved_zsh (zsh not installed)\n'
+        printf '  \033[33mSKIP\033[0m  test_no_unique_overrides_default_true_zsh (zsh not installed)\n'
     fi
 }
 

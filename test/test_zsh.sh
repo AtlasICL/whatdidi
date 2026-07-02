@@ -218,7 +218,7 @@ test_zsh_count_non_integer_returns_2() {
 }
 
 test_zsh_set_default_persists() {
-    run_ni_zsh --set-default 7
+    run_ni_zsh --set-default-count 7
     assert_eq 0 "$NI_EXIT" "exit code" &&
     local content
     content="$(cat "$TEST_HOME/.config/whatdidi/config")"
@@ -226,7 +226,7 @@ test_zsh_set_default_persists() {
 }
 
 test_zsh_set_default_bad_value_returns_2() {
-    run_ni_zsh --set-default 0
+    run_ni_zsh --set-default-count 0
     assert_eq 2 "$NI_EXIT" "exit code"
 }
 
