@@ -5,6 +5,10 @@
 whatdidi() {
   local needle count line default_count default_unique _wdi_conf _wdi_line stripped desudo
   local unique seen sep _wdi_arg _wdi_i _wdi_n _wdi_unique_seen
+  # Single source of truth for the version string. The test suite extracts this
+  # same line from the script (see EXPECTED_VERSION in test/helpers.sh) so the
+  # value only ever needs bumping here.
+  local version="1.4.0"
   _wdi_conf="${HOME}/.config/whatdidi/config"
   default_count=1
   # Track whether a default_unique= line was seen with a boolean, kept separate
@@ -85,7 +89,7 @@ whatdidi() {
   count="${2:-$default_count}"
 
   if [[ "$needle" == "--version" || "$needle" == "-v" ]]; then
-    echo "whatdidi 1.3.0"
+    echo "whatdidi $version"
     echo "Author: Emre Acarsoy"
     return 0
   fi

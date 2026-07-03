@@ -9,6 +9,14 @@ set -euo pipefail
 # Constants
 WHATDIDI_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/whatdidi"
 INSTALL_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/install"
+# Derive the expected version from the whatdidi script itself so tests never
+# hardcode it. We grep the single `local version="..."` declaration and strip
+# everything but the quoted value. Both the extraction (grep + sed) and the
+# result are plain external tools / a bare string, so this is identical under
+# bash 3.2 and zsh — the only shell-specific bit is reusing WHATDIDI_SRC, which
+# both runners already resolve the same way.
+EXPECTED_VERSION="$(grep -E '^[[:space:]]*local[[:space:]]+version=' "$WHATDIDI_SRC" | head -n 1 | sed -E 's/.*version="([^"]*)".*/\1/')"
+[[ -n "$EXPECTED_VERSION" ]] || { echo "failed to extract version from $WHATDIDI_SRC" >&2; exit 1; }
 # The exact line install adds to rc files and uninstall removes. It is a
 # $HOME-derived absolute path, and both install and whatdidi expand $HOME at
 # runtime — so under the sandbox (HOME=$TEST_HOME) it must expand to $TEST_HOME.

@@ -1,4 +1,4 @@
-![Version](https://img.shields.io/badge/version-1.3.0-blue)
+![Version](https://img.shields.io/badge/version-1.4.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Tests](https://github.com/AtlasICL/whatdidi/actions/workflows/test.yml/badge.svg)
 

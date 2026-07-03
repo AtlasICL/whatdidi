@@ -12,7 +12,7 @@ test_version_exits_zero() {
 test_version_prints_version_number() {
     run_ni --version
     assert_contains "$NI_STDOUT" "whatdidi" "has program name" &&
-    assert_contains "$NI_STDOUT" "1.3.0" "has version number"
+    assert_contains "$NI_STDOUT" "$EXPECTED_VERSION" "has version number"
 }
 
 test_version_prints_author() {
@@ -36,13 +36,13 @@ test_v_flag_same_as_version() {
 test_version_with_trailing_args_ignored() {
     run_ni --version extra
     assert_eq 0 "$NI_EXIT" "exit code" &&
-    assert_contains "$NI_STDOUT" "1.3.0" "still shows version"
+    assert_contains "$NI_STDOUT" "$EXPECTED_VERSION" "still shows version"
 }
 
 test_v_with_trailing_args_ignored() {
     run_ni -v extra
     assert_eq 0 "$NI_EXIT" "exit code" &&
-    assert_contains "$NI_STDOUT" "1.3.0" "still shows version"
+    assert_contains "$NI_STDOUT" "$EXPECTED_VERSION" "still shows version"
 }
 
 test_help_mentions_version() {
