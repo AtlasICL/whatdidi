@@ -185,6 +185,33 @@ test_config_both_keys_coexist() {
     assert_not_contains "$HI_STDERR" "invalid default_unique" "valid config produces no warning"
 }
 
+test_config_crlf_default_count_accepted() {
+    # L2: a hand-edited / Windows config with CRLF line endings must not be
+    # rejected as corrupt. Without trimming the trailing '\r', "default_count=3"
+    # arrives as "default_count=3\r" and fails the digit regex, spuriously
+    # warning "invalid default_count". The run_hi config plumbing writes with a
+    # plain '\n', so build the CRLF file directly in the sandbox.
+    local hist
+    hist="$(printf '%s\n' "curl aaa" "curl bbb" "curl ccc" "curl ddd" "curl eee")"
+    mkdir -p "$TEST_HOME/.config/whatdidi"
+    printf 'default_count=3\r\n' > "$TEST_HOME/.config/whatdidi/config"
+    run_hi "$hist" "curl"
+    assert_not_contains "$HI_STDERR" "invalid default_count" "CRLF default_count not rejected" &&
+    assert_line_count 3 "$HI_STDOUT" "CRLF default_count=3 takes effect"
+}
+
+test_config_crlf_default_unique_accepted() {
+    # Companion to the count case: a CRLF "default_unique=true" must be accepted
+    # (not warned) and take effect (dedup byte-identical matches).
+    local hist
+    hist="$(printf '%s\n' "curl aaa" "curl aaa" "echo hi" "curl aaa")"
+    mkdir -p "$TEST_HOME/.config/whatdidi"
+    printf 'default_unique=true\r\n' > "$TEST_HOME/.config/whatdidi/config"
+    run_hi "$hist" "curl 10"
+    assert_not_contains "$HI_STDERR" "invalid default_unique" "CRLF default_unique not rejected" &&
+    assert_line_count 1 "$HI_STDOUT" "CRLF default_unique=true dedups"
+}
+
 run_config_tests() {
     printf '\033[1mConfig sourcing\033[0m\n'
     run_test test_config_default_count_used
@@ -207,6 +234,8 @@ run_config_tests() {
     run_test test_config_default_unique_bogus_warns
     run_test test_config_default_unique_capitalized_warns
     run_test test_config_both_keys_coexist
+    run_test test_config_crlf_default_count_accepted
+    run_test test_config_crlf_default_unique_accepted
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

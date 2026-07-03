@@ -15,6 +15,12 @@ whatdidi() {
   _wdi_unique_seen=0
   if [[ -f "$_wdi_conf" ]]; then
     while IFS= read -r _wdi_line || [[ -n "$_wdi_line" ]]; do
+      # Trim a single trailing carriage return so hand-edited / Windows (CRLF)
+      # configs aren't rejected: without this a "default_count=3\r" line fails
+      # the digit regex and "default_unique=true\r" fails the true/false check,
+      # spuriously warning "invalid ... using ...". `$'\r'` is understood by
+      # both bash 3.2+ and zsh.
+      _wdi_line="${_wdi_line%$'\r'}"
       [[ "$_wdi_line" == default_count=* ]] && default_count="${_wdi_line#default_count=}"
       [[ "$_wdi_line" == default_unique=* ]] && { default_unique="${_wdi_line#default_unique=}"; _wdi_unique_seen=1; }
     done < "$_wdi_conf"
@@ -157,28 +163,46 @@ HELP
     # Track whether any rc rewrite failed so a partial failure isn't masked by
     # the success message + `return 0` at the end of the block.
     local uninstall_failed=0
+    # Declare the rc loop variable local: whatdidi is *sourced* into the user's
+    # interactive shell, so an undeclared `rc` would leak the last rc path into
+    # their environment after `whatdidi --uninstall`.
+    local rc rc_tmp
     if [[ -f "$install_path" ]]; then
       rm -f "$install_path"
       echo "whatdidi: removed $install_path"
+      # Clean up the now-empty install dir too. `rmdir` only removes an empty
+      # directory, so it fails harmlessly (and silently) if the user kept other
+      # files there or the dir is already gone.
+      rmdir "$(dirname "$install_path")" 2>/dev/null || true
     fi
     for rc in "${HOME}/.bashrc" "${HOME}/.zshrc"; do
       if [[ -f "$rc" ]] && grep -qxF "$source_line" "$rc" 2>/dev/null; then
+        # Create the scratch file with mktemp (unpredictable name — no clobbering
+        # an attacker-planted symlink at a guessable path) in the SAME directory
+        # as the rc file so it inherits the target's filesystem and permission
+        # context. Mirrors the installer's mktemp usage. On mktemp failure, warn
+        # and flag the failure rather than pressing on with an empty path.
+        if ! rc_tmp="$(mktemp "${rc}.XXXXXXXX")"; then
+          echo "whatdidi: failed to create a temp file to rewrite $rc" >&2
+          uninstall_failed=1
+          continue
+        fi
         # Don't gate on grep's exit status: when the source line is the ONLY
         # line, grep -v matches nothing and exits 1, which would otherwise skip
         # the write and orphan the temp file. We want the (possibly empty)
         # filtered output either way.
-        grep -vxF "$source_line" "$rc" > "${rc}.wdi_tmp"
+        grep -vxF "$source_line" "$rc" > "$rc_tmp"
         # Copy back with `cat >` rather than `mv` so a symlinked rc file (common
         # with dotfile managers) is edited in place — mv would replace the
         # symlink with a regular file and leave the real repo-managed file stale.
         # Only drop the temp file and claim success if the write actually
         # completed: if `cat >` fails mid-write (e.g. disk full) the temp copy is
         # the only intact version, so keep it and report the failure to stderr.
-        if cat "${rc}.wdi_tmp" > "$rc"; then
-          rm -f "${rc}.wdi_tmp"
+        if cat "$rc_tmp" > "$rc"; then
+          rm -f "$rc_tmp"
           echo "whatdidi: removed source line from $rc"
         else
-          echo "whatdidi: failed to rewrite $rc; left ${rc}.wdi_tmp in place" >&2
+          echo "whatdidi: failed to rewrite $rc; left $rc_tmp in place" >&2
           uninstall_failed=1
         fi
       fi
@@ -224,8 +248,14 @@ HELP
     # mirrors the write-through the uninstall rc-rewrite deliberately uses. The
     # read loop mirrors the portable `read` pattern used to load the config near
     # the top of this function (works identically in bash 3.2 and zsh).
-    local _wdi_tmp="${HOME}/.config/whatdidi/config.wdi_tmp.$$"
-    : > "$_wdi_tmp"
+    # Create the scratch file with mktemp (unpredictable name, no clobbering a
+    # guessable path) in the config dir just `mkdir -p`'d above so it shares the
+    # target's filesystem and permissions; mirrors the installer's mktemp usage.
+    local _wdi_tmp
+    if ! _wdi_tmp="$(mktemp "${HOME}/.config/whatdidi/config.XXXXXXXX")"; then
+      echo "whatdidi: failed to write $_wdi_conf" >&2
+      return 1
+    fi
     if [[ -f "$_wdi_conf" ]]; then
       while IFS= read -r _wdi_line || [[ -n "$_wdi_line" ]]; do
         [[ "$_wdi_line" == default_count=* ]] && continue
@@ -264,8 +294,14 @@ HELP
     # config is edited in place, and keep the temp file + report failure if the
     # write-through doesn't complete. The read loop is the same portable pattern
     # used everywhere else in this function (bash 3.2 and zsh agree).
-    local _wdi_tmp="${HOME}/.config/whatdidi/config.wdi_tmp.$$"
-    : > "$_wdi_tmp"
+    # Create the scratch file with mktemp (unpredictable name, no clobbering a
+    # guessable path) in the config dir just `mkdir -p`'d above so it shares the
+    # target's filesystem and permissions; mirrors the installer's mktemp usage.
+    local _wdi_tmp
+    if ! _wdi_tmp="$(mktemp "${HOME}/.config/whatdidi/config.XXXXXXXX")"; then
+      echo "whatdidi: failed to write $_wdi_conf" >&2
+      return 1
+    fi
     if [[ -f "$_wdi_conf" ]]; then
       while IFS= read -r _wdi_line || [[ -n "$_wdi_line" ]]; do
         [[ "$_wdi_line" == default_unique=* ]] && continue
@@ -325,7 +361,29 @@ HELP
       # without a timestamp column (which the sed below would otherwise leave
       # in, defeating the match). Reverse to newest-first with awk rather than
       # `tac`, which is GNU-only and absent on macOS/BSD.
-      HISTTIMEFORMAT= builtin history | awk '{ a[NR] = $0 } END { for (i = NR; i >= 1; i--) print a[i] }'
+      #
+      # Reverse by EVENT (record), not by physical line: with `shopt -s lithist`
+      # a multi-line command is stored with embedded newlines, so `history`
+      # prints it across several physical lines where only the first carries the
+      # leading event number. A naive per-line reversal would scramble those
+      # events. So: start a new record on a numbered line, append any following
+      # unnumbered continuation lines to the current record (joined with a
+      # newline so intra-record order is preserved), then emit records in
+      # reverse. `n > 0` guards the degenerate case where output somehow begins
+      # with a continuation line (nothing to append it to yet).
+      #
+      # Use `[ \t]` rather than the POSIX `[[:space:]]` class in the awk pattern:
+      # mawk 1.3.3 (the default awk on older Debian/Ubuntu) doesn't support
+      # `[[:space:]]`, so it would match nothing there and the pipeline would
+      # emit no history. `\t` in a bracket expression is honored by BSD/macOS
+      # awk, gawk and mawk alike.
+      HISTTIMEFORMAT= builtin history | awk '
+        {
+          if ($0 ~ /^[ \t]*[0-9]+[ \t]/) { n++; rec[n] = $0 }
+          else if (n > 0) { rec[n] = rec[n] "\n" $0 }
+        }
+        END { for (i = n; i >= 1; i--) print rec[i] }
+      '
     fi
   } | sed -E 's/^[[:space:]]*[0-9]+[[:space:]]+//' | \
   while IFS= read -r line; do

@@ -76,6 +76,35 @@ test_uninstall_removes_config_dir() {
     }
 }
 
+test_uninstall_removes_empty_install_dir() {
+    # L7: after removing the installed script, the now-empty install directory
+    # (~/.local/share/whatdidi) must be cleaned up too.
+    mkdir -p "$TEST_HOME/.local/share/whatdidi"
+    printf '# installed whatdidi\n' > "$TEST_HOME/.local/share/whatdidi/whatdidi"
+    run_wdi_stdin "Y" "--uninstall"
+    assert_eq 0 "$SI_EXIT" "clean exit" &&
+    [[ ! -e "$TEST_HOME/.local/share/whatdidi" ]] || {
+        printf '    empty install dir should be removed on uninstall\n'; return 1
+    }
+}
+
+test_uninstall_keeps_nonempty_install_dir() {
+    # L7: `rmdir` only removes the dir when empty — if the user kept unrelated
+    # files alongside the installed script, the directory (and those files) must
+    # survive.
+    mkdir -p "$TEST_HOME/.local/share/whatdidi"
+    printf '# installed whatdidi\n' > "$TEST_HOME/.local/share/whatdidi/whatdidi"
+    printf 'keepme\n' > "$TEST_HOME/.local/share/whatdidi/other"
+    run_wdi_stdin "Y" "--uninstall"
+    assert_eq 0 "$SI_EXIT" "clean exit" &&
+    { [[ -d "$TEST_HOME/.local/share/whatdidi" ]] || {
+        printf '    non-empty install dir must be preserved\n'; return 1
+    }; } &&
+    { [[ -f "$TEST_HOME/.local/share/whatdidi/other" ]] || {
+        printf '    unrelated file in install dir must be preserved\n'; return 1
+    }; }
+}
+
 test_uninstall_default_yes_on_empty_reply() {
     # Empty reply defaults to "Y" (uninstall proceeds).
     _seed_installed_state
@@ -104,10 +133,21 @@ test_uninstall_rc_with_only_source_line() {
     run_wdi_stdin "Y" "--uninstall"
     assert_eq 0 "$SI_EXIT" "clean exit" &&
     assert_eq 0 "$(count_lines_matching "$TEST_HOME/.bashrc" "$SOURCE_LINE")" \
-        "source line removed even when it was the only line" &&
-    [[ ! -e "$TEST_HOME/.bashrc.wdi_tmp" ]] || {
-        printf '    temp file .bashrc.wdi_tmp should not be orphaned\n'; return 1
-    }
+        "source line removed even when it was the only line" || return 1
+    # L5: uninstall now writes the scratch file as `mktemp "${rc}.XXXXXXXX"`
+    # (e.g. .bashrc.a1b2c3d4), not the old fixed .bashrc.wdi_tmp — a check for
+    # that literal name is now always true and detects nothing. Instead scan for
+    # ANY leftover `.bashrc.*` temp file. The glob's `.bashrc.` prefix requires a
+    # trailing suffix, so it never matches `.bashrc` itself. This test rewrites
+    # the rc successfully (the source line was the only line -> file becomes
+    # empty), so the temp file SHOULD have been cleaned up and none must remain.
+    # Nullglob-safe under bash 3.2: with no match the pattern stays literal and
+    # `-e` is false, so the loop body is skipped and the check passes.
+    local f
+    for f in "$TEST_HOME"/.bashrc.*; do
+        [[ -e "$f" ]] || continue
+        printf '    orphaned temp file %s should not remain\n' "$f"; return 1
+    done
 }
 
 test_uninstall_reports_error_on_unwritable_rc() {
@@ -232,6 +272,8 @@ run_lifecycle_tests() {
     run_test test_uninstall_removes_source_line_from_both_rc
     run_test test_uninstall_preserves_other_rc_content
     run_test test_uninstall_removes_config_dir
+    run_test test_uninstall_removes_empty_install_dir
+    run_test test_uninstall_keeps_nonempty_install_dir
     run_test test_uninstall_default_yes_on_empty_reply
     run_test test_uninstall_no_rc_files_still_clean
     run_test test_uninstall_rc_with_only_source_line

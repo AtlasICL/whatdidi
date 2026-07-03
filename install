@@ -83,8 +83,10 @@ add_source_line() {
         return 0
     fi
     if ! grep -qxF "$SOURCE_LINE" "$rc" 2>/dev/null; then
-        echo "" >> "$rc"
-        echo "$SOURCE_LINE" >> "$rc"
+        # Single append (leading newline + line) so a mid-append failure under
+        # `set -e` can't leave a stray blank line behind. Matches the idiom used
+        # for the ~/.bashrc fallback below.
+        printf '\n%s\n' "$SOURCE_LINE" >> "$rc"
         print_info "Added source line to $rc"
     else
         print_info "$rc already sources whatdidi - skipping"
