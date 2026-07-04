@@ -21,7 +21,7 @@ _PERF_HELPERS_LOADED=1
 # Absolute path to the whatdidi script under test. Resolved relative to THIS
 # file so the harness works regardless of the caller's CWD (perf_helpers.sh
 # lives in test/perf/, whatdidi lives two levels up at the repo root).
-WDI_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/whatdidi"
+WDI_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/whatdidi.sh"
 
 # History-list sizes for the seeded shells. The existing harness uses 10000,
 # which would TRUNCATE a 50k fixture and leave the scan covering only the newest

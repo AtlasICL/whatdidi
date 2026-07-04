@@ -7,8 +7,8 @@ _HELPERS_LOADED=1
 set -euo pipefail
 
 # Constants
-WHATDIDI_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/whatdidi"
-INSTALL_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/install"
+WHATDIDI_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/whatdidi.sh"
+INSTALL_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/install.sh"
 # Derive the expected version from the whatdidi script itself so tests never
 # hardcode it. We grep the single `local version="..."` declaration and strip
 # everything but the quoted value. Both the extraction (grep + sed) and the

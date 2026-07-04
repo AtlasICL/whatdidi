@@ -53,19 +53,19 @@ print_info "Installing whatdidi to $INSTALL_PATH ..."
 # Ensure the target directory exists before copying (no sudo needed — it's
 # under the user's own $HOME).
 mkdir -p "$(dirname "$INSTALL_PATH")"
-if [ -n "$script_dir" ] && [ -f "$script_dir/whatdidi" ]; then
-    print_info "Using local copy: $script_dir/whatdidi"
-    cp "$script_dir/whatdidi" "$INSTALL_PATH"
+if [ -n "$script_dir" ] && [ -f "$script_dir/whatdidi.sh" ]; then
+    print_info "Using local copy: $script_dir/whatdidi.sh"
+    cp "$script_dir/whatdidi.sh" "$INSTALL_PATH"
 else
     if ! command -v curl >/dev/null 2>&1; then
         print_error "curl is required to download whatdidi but was not found."
         exit 1
     fi
-    print_info "Downloading whatdidi from $REPO_RAW/whatdidi ..."
+    print_info "Downloading whatdidi from $REPO_RAW/whatdidi.sh ..."
     tmp="$(mktemp)"
     trap 'rm -f "$tmp"' EXIT INT TERM
-    if ! curl -fsSL "$REPO_RAW/whatdidi" -o "$tmp"; then
-        print_error "Failed to download whatdidi from $REPO_RAW/whatdidi"
+    if ! curl -fsSL "$REPO_RAW/whatdidi.sh" -o "$tmp"; then
+        print_error "Failed to download whatdidi from $REPO_RAW/whatdidi.sh"
         exit 1
     fi
     cp "$tmp" "$INSTALL_PATH"
