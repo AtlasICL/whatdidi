@@ -7,7 +7,7 @@ A command line tool for when you need a specific command you ran.
 
 ## Install
 ```
-curl -fsSL https://raw.githubusercontent.com/AtlasICL/whatdidi/main/install | sh
+curl -fsSL https://raw.githubusercontent.com/AtlasICL/whatdidi/main/install.sh | sh
 ```
 Compatible with bash and zsh.  
 
@@ -53,12 +53,13 @@ The flag can go anywhere, e.g. `whatdidi -u git`. When unique is the default (se
 ```
 whatdidi --set-default-count 3
 ```
-This preference is stored in `~/.config/whatdidi/config`
+This preference is stored in `~/.config/whatdidi/config`.
 
 #### See only unique results by default:
 ```
 whatdidi --set-default-unique true
 ```
+This preference is also stored in `~/.config/whatdidi/config`.
 
 #### Update to the latest version:
 ```
