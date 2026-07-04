@@ -8,7 +8,7 @@ whatdidi() {
   # Single source of truth for the version string. The test suite extracts this
   # same line from the script (see EXPECTED_VERSION in test/helpers.sh) so the
   # value only ever needs bumping here.
-  local version="1.4.0"
+  local version="1.4.1"
   _wdi_conf="${HOME}/.config/whatdidi/config"
   default_count=1
   # Track whether a default_unique= line was seen with a boolean, kept separate
