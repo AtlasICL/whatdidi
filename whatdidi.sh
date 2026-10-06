@@ -8,7 +8,7 @@ whatdidi() {
   # Single source of truth for the version string. The test suite extracts this
   # same line from the script (see EXPECTED_VERSION in test/helpers.sh) so the
   # value only ever needs bumping here.
-  local version="1.4.1"
+  local version="1.5.0"
   _wdi_conf="${HOME}/.config/whatdidi/config"
   default_count=1
   # Track whether a default_unique= line was seen with a boolean, kept separate
@@ -346,89 +346,69 @@ HELP
     builtin history -n 2>/dev/null || true
   fi
 
-  # Dedup state for -u/--unique. `seen` is a newline-joined set of already-printed
-  # lines; a newline separator is safe because each $line read below is a single
-  # history line and so can never contain a newline itself — no line can straddle
-  # a separator and produce a false match. Membership is tested with a portable
-  # `case` glob rather than an associative array (unavailable in bash 3.2, spelled
-  # differently in zsh).
-  seen=""
-  sep=$'\n'
+  # All matching happens in ONE awk process that reads history newest-first and
+  # exits as soon as it has printed `count` lines. A shell `while read` loop
+  # costs ~6us/line just for `read` (one syscall per byte on a pipe) plus the
+  # glob tests, i.e. ~1s per 50k lines; awk does the same work in <1us/line and
+  # its early exit SIGPIPEs the producer so the best case never lists the
+  # whole history.
+  #
+  # The needle goes through ENVIRON, not `-v`: `-v` interprets backslash
+  # escapes, which would mangle a needle like 'printf \n'.
+  #
+  # Producers (both emit newest event first, lines within an event in order):
+  #   bash: `fc -lnr 1` prefixes each event's first line with "\t " (or "\t*"
+  #         for an edited entry); lithist continuation lines are raw. fc also
+  #         omits the current command line (the whatdidi call itself).
+  #   zsh:  `fc -rln 1` prints each event on one line, no prefix.
+  #
+  # mawk (default awk on Debian/Ubuntu) blocks until its input buffer is full
+  # before running any rule, which defeats the early exit: the producer has to
+  # emit ~100s of KB first. `-W interactive` makes it read line by line. BWK awk
+  # (macOS) and gawk read what is available and need no flag. Detect once per
+  # shell session and cache the answer in a global.
+  if [ -z "${_WDI_AWK_IS_MAWK:-}" ]; then
+    case "$(awk -W version 2>&1 </dev/null)" in
+      mawk*) _WDI_AWK_IS_MAWK=1 ;;
+      *)     _WDI_AWK_IS_MAWK=0 ;;
+    esac
+  fi
+  # needle/count are already captured, so the positional params are free to
+  # carry the optional awk flags (bash 3.2 has no arrays to spare for this).
+  if [ "$_WDI_AWK_IS_MAWK" = 1 ]; then set -- -W interactive; else set --; fi
 
-  # Walk history from most-recent to oldest and print the first N matches.
-  # Both shells emit "<number>  <command>"; the sed strips the leading number.
   {
     if [ -n "${ZSH_VERSION:-}" ]; then
-      builtin fc -rl 1            # zsh: reverse-list ALL events (1 = from start)
+      builtin fc -rln 1
     else
-      # Clear HISTTIMEFORMAT for this call so `history` emits "<n>  <command>"
-      # without a timestamp column (which the sed below would otherwise leave
-      # in, defeating the match). Reverse to newest-first with awk rather than
-      # `tac`, which is GNU-only and absent on macOS/BSD.
-      #
-      # Reverse by EVENT (record), not by physical line: with `shopt -s lithist`
-      # a multi-line command is stored with embedded newlines, so `history`
-      # prints it across several physical lines where only the first carries the
-      # leading event number. A naive per-line reversal would scramble those
-      # events. So: start a new record on a numbered line, append any following
-      # unnumbered continuation lines to the current record (joined with a
-      # newline so intra-record order is preserved), then emit records in
-      # reverse. `n > 0` guards the degenerate case where output somehow begins
-      # with a continuation line (nothing to append it to yet).
-      #
-      # Use `[ \t]` rather than the POSIX `[[:space:]]` class in the awk pattern:
-      # mawk 1.3.3 (the default awk on older Debian/Ubuntu) doesn't support
-      # `[[:space:]]`, so it would match nothing there and the pipeline would
-      # emit no history. `\t` in a bracket expression is honored by BSD/macOS
-      # awk, gawk and mawk alike.
-      HISTTIMEFORMAT= builtin history | awk '
-        {
-          if ($0 ~ /^[ \t]*[0-9]+[ \t]/) { n++; rec[n] = $0 }
-          else if (n > 0) { rec[n] = rec[n] "\n" $0 }
-        }
-        END { for (i = n; i >= 1; i--) print rec[i] }
-      '
+      builtin fc -lnr 1
     fi
-  } | sed -E 's/^[[:space:]]*[0-9]+[[:space:]]+//' | \
-  while IFS= read -r line; do
-    [[ -z "$line" ]] && continue
-    [[ "$needle" != whatdidi* && "$line" == whatdidi\ * ]] && continue
+  } 2>/dev/null | WDI_NEEDLE="$needle" WDI_COUNT="$count" WDI_UNIQUE="$unique" WDI_ZSH="${ZSH_VERSION:+1}" awk "$@" '
+    function hit(s) {
+      return substr(s, 1, nl) == needle && (length(s) == nl || substr(s, nl + 1, 1) ~ /[ \t\r\f\v]/)
+    }
+    BEGIN {
+      needle = ENVIRON["WDI_NEEDLE"]; nl = length(needle)
+      count = ENVIRON["WDI_COUNT"] + 0; uniq = (ENVIRON["WDI_UNIQUE"] == "1")
+      selff = (substr(needle, 1, 8) != "whatdidi"); zsh = (ENVIRON["WDI_ZSH"] == "1")
+    }
+    {
+      if (!index($0, needle)) next
+      line = $0
+      if (zsh) sub(/^[ \t]+/, "", line); else sub(/^\t[ *][ \t]*/, "", line)
+      if (line == "") next
+      if (selff && substr(line, 1, 9) == "whatdidi ") next
+      s = line; sub(/^[ \t\r\f\v]+/, "", s)
+      if (!hit(s)) {
+        if (substr(s, 1, 4) != "sudo" || substr(s, 5, 1) !~ /[ \t\r\f\v]/) next
+        s = substr(s, 5); sub(/^[ \t\r\f\v]+/, "", s)
+        if (!hit(s)) next
+      }
+      if (uniq) { if (line in seen) next; seen[line] = 1 }
+      print line
+      if (--count <= 0) exit
+    }
+  '
 
-    # Match the needle literally (not as a regex) so command names containing
-    # regex metacharacters — g++, c++, ./foo — are found. Strip leading
-    # whitespace, treat a leading `sudo` as transparent, and require the needle
-    # to be the whole command or be followed by whitespace (word boundary).
-    # Note: "$needle" is quoted (literal) while [[:space:]]* is the glob part.
-    stripped="${line#"${line%%[![:space:]]*}"}"
-    desudo="$stripped"
-    case "$desudo" in
-      sudo[[:space:]]*)
-        desudo="${desudo#sudo}"
-        desudo="${desudo#"${desudo%%[![:space:]]*}"}"
-        ;;
-    esac
-
-    if [[ "$stripped" == "$needle" || "$stripped" == "$needle"[[:space:]]* || \
-          "$desudo"  == "$needle" || "$desudo"  == "$needle"[[:space:]]* ]]; then
-      # With -u, collapse byte-identical printed lines: skip this match if an
-      # identical line was already printed. "$line" is quoted inside the pattern
-      # so it matches LITERALLY (command names may contain glob metacharacters
-      # like g++ or ./foo); only the surrounding $sep is glob. count is decremented
-      # only on an actual print, so it means "up to N unique matches."
-      if [[ "$unique" -eq 1 ]]; then
-        case "$sep$seen$sep" in
-          *"$sep$line$sep"*) continue ;;
-        esac
-        seen="$seen$sep$line"
-      fi
-      printf '%s\n' "$line"
-      count=$((count-1))
-      [[ "$count" -le 0 ]] && break
-    fi
-  done
-
-  # The while loop's exit status leaks the last iteration's test result, which
-  # differs between bash and zsh. Return success explicitly so the exit code is
-  # deterministic (whatdidi reports 0 whether or not anything matched).
   return 0
 }
