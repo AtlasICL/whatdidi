@@ -2,21 +2,22 @@
 #
 # bench.sh — empirical performance harness for the `whatdidi` history search.
 #
-# WHY: whatdidi has two shell-specific search paths (see the script, ~L207-244).
-# The zsh path streams history newest-first via `fc -rl` and early-exits once it
-# has collected `count` matches. The bash path pipes `history` through an awk
-# program that buffers the ENTIRE history into an array before emitting anything
-# (to reverse it without GNU `tac`), so the awk stage can never early-exit and
-# always pays a full-history cost. This harness measures both paths against a
-# large, deterministic fixture with a KNOWN match distribution so that cost
-# difference is observable rather than asserted.
+# WHY: whatdidi lists the shell's history newest-first (`fc -lnr` in bash,
+# `fc -rln` in zsh) and pipes it into one awk program that prints the first
+# `count` matches and exits. Its cost therefore depends on how far back the
+# matches are: a recent hit stops almost immediately, while an absent needle
+# reads the whole history. This harness measures both shells against a large,
+# deterministic fixture with a KNOWN match distribution so those costs are
+# observable rather than asserted.
 #
 # USAGE:
-#   bash test/perf/bench.sh
+#   bash perf/bench.sh
 #
 # ENV KNOBS (all optional):
 #   SIZE    history fixture size in lines            (default 50000)
-#   ITERS   batch size K: calls timed per stamp pair  (default 20)
+#   ITERS   batch size K: calls timed per stamp pair  (default auto)
+#           auto = 3 when the shell has the fork-free $EPOCHREALTIME clock
+#           (bash 5+, zsh), 20 when it falls back to perl (bash 3.2).
 #   REPS    repetitions R: timing samples per cell    (default 10)
 #   SHELLS  space-separated shells to test            (default "bash zsh")
 #           A requested shell whose binary is absent is skipped with a note.
@@ -50,7 +51,7 @@ source "$SCRIPT_DIR/perf_helpers.sh"
 
 # --- Configuration (env-overridable) ---------------------------------------
 SIZE="${SIZE:-50000}"
-ITERS="${ITERS:-20}"
+ITERS="${ITERS:-auto}"
 REPS="${REPS:-10}"
 SHELLS="${SHELLS:-bash zsh}"
 
@@ -58,6 +59,7 @@ SHELLS="${SHELLS:-bash zsh}"
 # up deep inside the runners with a cryptic arithmetic error.
 for _kv in "SIZE=$SIZE" "ITERS=$ITERS" "REPS=$REPS"; do
   _k="${_kv%%=*}"; _v="${_kv#*=}"
+  [[ "$_k" == ITERS && "$_v" == auto ]] && continue
   if ! [[ "$_v" =~ ^[0-9]+$ ]] || [[ "$_v" -lt 1 ]]; then
     echo "bench.sh: $_k must be a positive integer (got: $_v)" >&2
     exit 2
@@ -123,7 +125,11 @@ if command -v zsh >/dev/null 2>&1; then
 fi
 printf '  fixture: %s lines (SIZE=%s, seed=%s)\n' \
   "$FIXTURE_LINES" "$SIZE" "${WDI_HIST_SEED:-1}"
-printf '  batch:   ITERS(K)=%s  REPS(R)=%s\n' "$ITERS" "$REPS"
+if [[ "$ITERS" == auto ]]; then
+  printf '  batch:   ITERS(K)=auto (3 with $EPOCHREALTIME, 20 with perl)  REPS(R)=%s\n' "$REPS"
+else
+  printf '  batch:   ITERS(K)=%s  REPS(R)=%s\n' "$ITERS" "$REPS"
+fi
 printf '  shells:  %s\n\n' "${AVAIL_SHELLS[*]}"
 
 # --- Scenarios ---------------------------------------------------------------

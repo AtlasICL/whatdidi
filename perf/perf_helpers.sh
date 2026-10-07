@@ -20,7 +20,7 @@ _PERF_HELPERS_LOADED=1
 
 # Absolute path to the whatdidi script under test. Resolved relative to THIS
 # file so the harness works regardless of the caller's CWD (perf_helpers.sh
-# lives in test/perf/, whatdidi lives two levels up at the repo root).
+# lives in perf/, whatdidi.sh one level up at the repo root).
 WDI_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/whatdidi.sh"
 
 # History-list sizes for the seeded shells. The existing harness uses 10000,
@@ -40,21 +40,22 @@ PERF_PS_SENTINEL='__WDI_PERF_ECHO__'
 # _perf_now_snippet
 #
 # Prints shell code (to stdout) that, when executed inside the seeded shell,
-# defines `_wdi_now` — "seconds since the epoch as a float". WHY a snippet
-# rather than a helper on the outside: the timing must happen *inside* the same
-# interactive shell that hosts the seeded history, with no extra process
-# boundary per call.
+# defines `_wdi_stamp`, which stores "seconds since the epoch as a float" in the
+# global `__wdi_now`. WHY a snippet rather than a helper on the outside: the
+# timing must happen *inside* the same interactive shell that hosts the seeded
+# history, with no extra process boundary per call.
 #
-# Clock selection, fastest first (note: `$(_wdi_now)` ALWAYS forks a subshell for
-# the command substitution — the difference below is only the EXTRA cost inside
-# that subshell):
-#   1. $EPOCHREALTIME — a builtin float clock read with no additional process.
-#      bash >= 5 exposes it natively; zsh exposes it after `zmodload
-#      zsh/datetime`. Preferred for the zsh best case, where a call is sub-ms.
-#   2. perl Time::HiRes — portable fallback for bash 3.2 (stock macOS), which
-#      has no $EPOCHREALTIME. This adds a second fork (the perl process) on top of
-#      the subshell. We only stamp twice per repetition, so that cost is amortised
-#      over K calls and dominates the per-call figure only at very small ITERS.
+# WHY a variable instead of printing: reading a clock via `$(...)` always forks
+# a subshell (~1ms), which is as long as a fast whatdidi call. Assigning a
+# variable costs nothing, so with a builtin clock each batch can be tiny (see
+# ITERS=auto in bench.sh) and the whole harness runs in seconds.
+#
+# Clock selection, fastest first:
+#   1. $EPOCHREALTIME — a builtin float clock, read with NO fork. bash >= 5
+#      exposes it natively; zsh exposes it after `zmodload zsh/datetime`.
+#   2. perl Time::HiRes — fallback for bash 3.2 (stock macOS /bin/bash), which
+#      has no $EPOCHREALTIME. Costs a subshell plus a perl process per stamp, so
+#      ITERS=auto batches 20 calls per stamp pair to amortise it.
 #
 # We deliberately do NOT use `date +%s.%N`: BSD/macOS `date` has no %N and would
 # emit a literal "N", silently corrupting the arithmetic.
@@ -74,17 +75,17 @@ PERF_PS_SENTINEL='__WDI_PERF_ECHO__'
 # executable lines. Line-by-line meaning of the snippet below:
 #   * `zmodload zsh/datetime` — zsh: expose $EPOCHREALTIME (no-op under bash,
 #     error swallowed).
-#   * `_wdi_now` — prints "seconds since epoch" as a float. Prefers the builtin
-#     $EPOCHREALTIME (bash>=5 / zsh, no extra process beyond the subshell); falls
-#     back to perl Time::HiRes on bash 3.2 (stock macOS), which lacks it.
+#   * `_wdi_stamp` — sets __wdi_now from $EPOCHREALTIME when it exists (no
+#     fork), otherwise from perl Time::HiRes. If neither works __wdi_now ends up
+#     empty, which the timing body treats as "no sample".
 _perf_now_snippet() {
   cat <<'SNIPPET'
 zmodload zsh/datetime 2>/dev/null || true
-_wdi_now() {
+_wdi_stamp() {
   if [ -n "${EPOCHREALTIME:-}" ]; then
-    printf '%s\n' "$EPOCHREALTIME"
+    __wdi_now=$EPOCHREALTIME
   else
-    perl -MTime::HiRes=time -e 'printf "%.6f\n", time'
+    __wdi_now=$(perl -MTime::HiRes=time -e 'printf "%.6f\n", time' 2>/dev/null)
   fi
 }
 SNIPPET
@@ -129,41 +130,46 @@ perf_stats() {
 #     consecutive `whatdidi ARGS` calls (stdout+stderr to /dev/null), stamps
 #     again, and prints the PER-CALL time = (t1 - t0) / K.
 #
-# WHY batch by K: a single zsh best-case call can be well under a millisecond —
-# smaller than the fork overhead of even one clock read. Timing K calls between
-# a single pair of stamps amortises that overhead so the per-call figure is
-# meaningful. R gives us a distribution (min/median/mean/max) over batches.
+# K may be a positive integer or the word `auto`. Batching K calls between one
+# pair of stamps amortises the clock's own cost. With the fork-free
+# $EPOCHREALTIME clock that cost is ~0, so `auto` uses K=3 (a little smoothing,
+# not much work); with the perl fallback each stamp costs a few ms, so `auto`
+# uses K=20. The choice is made INSIDE the seeded shell because only it knows
+# which clock it has. R gives the distribution (min/median/mean/max).
 #
-# ARGS is injected verbatim (e.g. `wdi_recent_needle 1`); K and R are integers.
+# ARGS is injected verbatim (e.g. `wdi_recent_needle 1`); R is an integer.
 # C-style `for ((...))` loops are supported by both bash 3.2 and zsh 5.
 #
 # As with _perf_now_snippet, the emitted body is COMMENT-FREE (see the note there
 # for why zsh -i mangles injected comments). Line-by-line meaning:
+#   * `__wdi_k` — resolves K (`auto` -> 3 or 20 depending on the clock).
 #   * first `whatdidi` call — warmup, output discarded; primes the history scan
-#     so the first timed batch isn't skewed by one-off setup (awk buffering on
-#     the bash path, filesystem caches, etc.).
-#   * outer loop (R times) — stamps `_wdi_now` before/after a batch of K calls.
+#     so the first timed batch isn't skewed by one-off setup (the one-time awk
+#     detection, filesystem caches, etc.).
+#   * outer loop (R times) — stamps `_wdi_stamp` before/after a batch of K calls.
 #   * inner loop (K times) — the calls actually being timed, output to /dev/null.
 #   * awk — prints per-call seconds = (t1 - t0) / K to stdout for the caller;
 #     awk does the float subtraction/division portably and precisely. It runs
 #     ONLY when both stamps are non-empty: if the clock is broken (no
-#     $EPOCHREALTIME AND no perl/Time::HiRes) _wdi_now emits nothing, and we must
-#     emit NO sample rather than a fake "0.000000" that (b-a)/k would produce —
-#     otherwise bench.sh's `^[0-9]` guard would accept it and print a misleading
-#     0.000 row instead of dashes.
+#     $EPOCHREALTIME AND no perl/Time::HiRes) we must emit NO sample rather than
+#     a fake "0.000000" that (b-a)/k would produce — otherwise bench.sh's
+#     `^[0-9]` guard would accept it and print a misleading 0.000 row instead of
+#     dashes. awk runs outside the stamped interval, so its fork isn't timed.
 # ---------------------------------------------------------------------------
 _perf_timing_body() {
   local args="$1" k="$2" r="$3"
   cat <<BODY
+__wdi_k=$k
+if [ "\$__wdi_k" = auto ]; then if [ -n "\${EPOCHREALTIME:-}" ]; then __wdi_k=3; else __wdi_k=20; fi; fi
 whatdidi $args >/dev/null 2>&1
 for ((__r = 0; __r < $r; __r++)); do
-  __t0=\$(_wdi_now)
-  for ((__k = 0; __k < $k; __k++)); do
+  _wdi_stamp; __t0=\$__wdi_now
+  for ((__i = 0; __i < __wdi_k; __i++)); do
     whatdidi $args >/dev/null 2>&1
   done
-  __t1=\$(_wdi_now)
+  _wdi_stamp; __t1=\$__wdi_now
   if [ -n "\$__t0" ] && [ -n "\$__t1" ]; then
-    awk -v a="\$__t0" -v b="\$__t1" -v k="$k" 'BEGIN { printf "%.6f\n", (b - a) / k }'
+    awk -v a="\$__t0" -v b="\$__t1" -v k="\$__wdi_k" 'BEGIN { printf "%.6f\n", (b - a) / k }'
   fi
 done
 BODY
